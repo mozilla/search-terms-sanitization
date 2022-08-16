@@ -1,0 +1,6 @@
+# Notebooks
+.ipynb_checkpoints/
+__pycache__/
+
+# MAC os garbage
+.DS_Store
