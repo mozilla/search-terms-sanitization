@@ -1,12 +1,9 @@
 # search-terms-sanitization
 Code for evaluating and implementing search terms sanitization.
 
-# Privacy & security warning
-This repo may contain notebooks or outputs with aggregated search terms related data. 
-
 # Working in this repo
 ## Making commits
-Check with the previous author before over-writing previously committed Notebook outputs.
+Open a PR and get one passing review from a reviewer before merging.
 
 ## Directory structure
 This repo's directory structure is minimal for now. We'll add more structure as we go.
@@ -15,8 +12,6 @@ This repo's directory structure is minimal for now. We'll add more structure as 
 |---|---|
 | assets | shareable data like US Census surnames |
 | non_sensitive | analysis and related data that do not involve sensitive search data |
-| notebooks | analysis involving sensitive search data. See [this example](https://github.com/MozillaDataScience/search-terms-sanitization/pull/4) for how to import code into notebooks |
-| private_output | placeholder for writing non-shareable data. nothing in this folder is tracked by git.
 | src | reusable python code |
 
 ## Modules
@@ -32,7 +27,6 @@ So far, we're just putting shared code and reusable functions in `src`. Here are
 ```bash
 pip install -r requirements.txt
 
-# Presidio analyzer requires a spaCy language model.
 # We should keep track of the language model version we're using. Can start with the latest.
 python -m spacy download en_core_web_lg
 ```
