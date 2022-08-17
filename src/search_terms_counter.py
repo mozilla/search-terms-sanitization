@@ -1,11 +1,12 @@
 from nltk import edit_distance, ngrams
-from evaluate import str_to_words
-from helpers import get_queries, get_scrabble
 from random import sample as random_sample
 from statistics import mean
 import spacy
 import pandas as pd
 import os
+
+from .evaluate import str_to_words
+from .helpers import get_queries, get_scrabble
 
 class SearchTermsCounter:
     def __init__(self, dataset, terminal_only=True):

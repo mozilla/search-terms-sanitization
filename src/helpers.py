@@ -62,7 +62,7 @@ def get_surnames():
         w for w in pd._libs.parsers.STR_NA_VALUES
         if not (w.isupper() and w.isalpha())
     ]
-    df = pd.read_csv(f"{ASSET_DIR}/Names_2010Census.csv", na_values=na_vals, keep_default_na=False)
+    df = pd.read_csv(f"{ASSET_DIR}/names/Names_2010Census.csv", na_values=na_vals, keep_default_na=False)
     return df.name.str.lower().tolist()[:-1]
 
 

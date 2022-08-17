@@ -5,7 +5,7 @@ Apply PII detection approaches.
 import string
 from presidio_analyzer import AnalyzerEngine
 import spacy
-from helpers import *
+from .helpers import *
 
 surnames = get_surnames()
 scrabble = get_scrabble()
