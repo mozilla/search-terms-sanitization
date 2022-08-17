@@ -26,6 +26,11 @@ pip install -r requirements.txt
 # We should keep track of the language model version we're using. Can start with the latest.
 python -m spacy download en_core_web_lg
 ```
+4. Optional: If you want to use the code in the `src/` directory as a python library, you can pip install it:
+```bash
+cd src/           # make sure you're in the src/ directory
+pip install -e .  # -e installs in editable (develop) mode
+```
 
 ## Outputs
 The nightly sanitization job writes data to
