@@ -14,7 +14,7 @@ This repo's directory structure is minimal for now. We'll add more structure as 
 | nightly-job | code for the sanitization job that runs nightly |
 | assets | public data like US Census surnames |
 | non_sensitive | analyses that do not involve sensitive search data |
-| src | reusable python code for the research team |
+| suggest_search_tools | reusable python code for the research team |
 
 ## Set-up
 1. Request access to the `search-terms-unsanitized@mozdata.iam.gserviceaccount.com` service account. [This documentation describes](https://docs.telemetry.mozilla.org/cookbooks/bigquery/access.html#notebooks-access-to-workgroup-confidential-datasets) how.
@@ -25,6 +25,11 @@ pip install -r requirements.txt
 
 # We should keep track of the language model version we're using. Can start with the latest.
 python -m spacy download en_core_web_lg
+```
+4. Optional: If you want to use the code in the `suggest_search_tools/` directory as a python library, you can pip install it:
+```bash
+cd search-terms-sanitization/  # make sure you're in the search-terms-sanitization/ directory
+pip install -e .               # -e installs in editable (develop) mode
 ```
 
 ## Outputs
