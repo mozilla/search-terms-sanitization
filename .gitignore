@@ -1,7 +1,7 @@
 # Notebooks
 .ipynb_checkpoints/
 __pycache__/
-src/src.egg-info/*
+*.egg-info/*
 
 # MAC os garbage
 .DS_Store
