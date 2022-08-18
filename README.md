@@ -28,8 +28,8 @@ python -m spacy download en_core_web_lg
 ```
 4. Optional: If you want to use the code in the `suggest_search_tools/` directory as a python library, you can pip install it:
 ```bash
-cd suggest_search_tools/           # make sure you're in the suggest_search_tools/ directory
-pip install -e .  # -e installs in editable (develop) mode
+cd search-terms-sanitization/  # make sure you're in the search-terms-sanitization/ directory
+pip install -e .               # -e installs in editable (develop) mode
 ```
 
 ## Outputs
