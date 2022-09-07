@@ -73,6 +73,6 @@ class BQTable:
             raise ValueError("Table must be created or loaded first")
         
         job_config = bigquery.LoadJobConfig(write_disposition=bigquery.WriteDisposition.WRITE_TRUNCATE)
-        overwrite_job = client.load_table_from_dataframe(df, self.table, job_config=job_config)
+        overwrite_job = bqclient.load_table_from_dataframe(df, self.table, job_config=job_config)
         overwrite_job.result()
     
