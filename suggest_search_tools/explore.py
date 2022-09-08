@@ -45,6 +45,7 @@ class SearchAnnotator:
     Eg.
     ```
     sa = SearchAnnotator(df)
+    sa.set_prompt()
     sa.run()
     # Run through queries and exit
     sa.get_tags()
@@ -61,6 +62,7 @@ class SearchAnnotator:
         Option("p", "PII - numeric/at", "pii_numat"),
         Option("r", "mark for review", "_review"),
     ]
+    prompt_message = "PII?"
     control_options = {
         "back": Option("b", "back", None),
         "google": Option("g", "search in Google", None),
@@ -70,18 +72,27 @@ class SearchAnnotator:
     def __init__(self, df_search):
         self.df = df_search
         self.tags = pd.Series(None, index=self.df.index)
-
         self.current_i = 0
         self.should_continue = True
-
+        self.google = False
+    
+    def set_tag_options(self, tag_options):
+        control_option_keys = [x.key for x in self.control_options.values()]
+        for o in tag_options:
+            if o.key in control_option_keys:
+                raise UserError("You can't use the control options as a tag option.")
+        self.tag_options = tag_options
+    
+    def set_prompt(self, prompt_message=None):
+        if not prompt_message:
+            prompt_message = self.prompt_message
         prompt_opts = "\n".join(
             [
                 f"{o.key}: {o.display_name}"
                 for o in self.tag_options + list(self.control_options.values())
             ]
         )
-        self.prompt = f"\nPII?\n{prompt_opts}\n\n"
-        self.google = False
+        self.prompt = f"\n{self.prompt_message}\n{prompt_opts}\n\n"
 
     def request_input(self):
         current = self.df.iloc[[self.current_i]]
