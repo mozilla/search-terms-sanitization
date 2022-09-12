@@ -27,10 +27,17 @@ async def run_sanitation(args):
         total_deemed_sanitary = 0
         summary_run_data = {}
         summary_language_data = {}
+        
+        data_validation_sample = pd.DataFrame()
 
         unsanitized_search_term_stream = stream_search_terms()  # load unsanitized search terms
+        
         for raw_page in unsanitized_search_term_stream:
             total_run += raw_page.shape[0]
+            
+            one_percent_sample = raw_page.sample(frac = 0.01)
+            data_validation_sample = data_validation_sample.append(one_percent_sample)
+            
             pii_in_query_mask, run_data, language_data = await detect_pii(raw_page['query'], census_surnames)
             sanitized_page = raw_page.loc[
                 ~numpy.array(pii_in_query_mask)]  # ~ reverses the mask so we get the queries WITHOUT PII in them
@@ -46,6 +53,8 @@ async def run_sanitation(args):
             export_search_queries_to_bigquery(dataframe=sanitized_page,
                                               destination_table_id=args.sanitized_term_destination, date=yesterday)
         end_time = datetime.utcnow()
+        
+        #THIS IS WHERE YOU DO SOMETHING WITH THE DATA VALIDATION SAMPLE
 
         implementation_notes = "Run with a page_size of UNLIMITED from script"
         record_job_metadata(status='SUCCESS', started_at=start_time, ended_at=end_time,
