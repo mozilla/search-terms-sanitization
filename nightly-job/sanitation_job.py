@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 import argparse
 
-from query_sanitization import stream_search_terms, detect_pii, export_search_queries_to_bigquery, record_job_metadata
+from query_sanitization import stream_search_terms, detect_pii, export_search_queries_to_bigquery, export_sample_to_bigquery, record_job_metadata
 import numpy
 import pandas as pd
 import asyncio
@@ -14,6 +14,7 @@ parser = argparse.ArgumentParser(description="Sanitize Search Terms",
                                  formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument("--sanitized_term_destination", help="Destination table for sanitary search terms")
 parser.add_argument("--job_reporting_destination", help="Destination table for sanitation job metadata")
+parser.add_argument("--unsanitized_term_sample_destination", help="Destination table for a sample of unsanitized search terms")
 args = parser.parse_args()
 
 df = pd.read_csv('Names_2010Census.csv')
@@ -27,6 +28,7 @@ async def run_sanitation(args):
         total_deemed_sanitary = 0
         summary_run_data = {}
         summary_language_data = {}
+        yesterday = datetime.utcnow().date() - timedelta(days=1)
         
         data_validation_sample = pd.DataFrame()
 
@@ -54,7 +56,7 @@ async def run_sanitation(args):
                                               destination_table_id=args.sanitized_term_destination, date=yesterday)
         end_time = datetime.utcnow()
         
-        #THIS IS WHERE YOU DO SOMETHING WITH THE DATA VALIDATION SAMPLE
+        export_sample_to_bigquery(dataframe=data_validation_sample, sample_table_id=args.unsanitized_term_sample_destination, date=yesterday)
 
         implementation_notes = "Run with a page_size of UNLIMITED from script"
         record_job_metadata(status='SUCCESS', started_at=start_time, ended_at=end_time,
