@@ -194,6 +194,59 @@ def export_search_queries_to_bigquery(dataframe, destination_table_id, date):
         table=destination_table, dataframe=dataframe
     )
     print(job)  # Wait for the job to complete.
+    
+def export_sample_to_bigquery(dataframe, sample_table_id, date):
+    """
+    Append unsanitized queries to the BigQuery table where we are keeping samples of one percent of each job's search volume for data validation purposes.
+    
+    Arguments:
+    - dataframe: A dataframe of queries to be added. This is the 1% sample.
+        Dataframe should include a timestamp field of the timestamp type, plus all fields listed in the schema variable in this function's implementation.
+    - destination_table_id: the fully qualified name of the table for the data to be exported into.
+    - date: The date for which these queries are being inserted. IMPORTANT: this function will overwrite EVERYTHING in the destination table at that date partition with the data in the dataframe passed in.
+    
+    Returns: Nothing.
+    It does print a result value as a cursory logging mechanism. That result object can be parsed and logged to wherever we like.
+    
+    HUGE NOTE: You will notice that this function's implementation almost matches that of `export_search_queries_to_bigquery.` I deliberately did not extract out the common behavior. Why:
+    - Two occurrences is not enough to convince me that two similar pieces of code in fact represent the same concept. I follow a rule of three.
+    - Moreover they write to two different tables. So that decreases the likelihood that these two similar pieces of code represent the same concept anyway.
+    - One of the functions (this one) deals with SENSITIVE UNSANITIZED search data, and the other one does not. What we DO NOT NEED is a situation where someone does not fully understand this and makes a change to a shared piece of code that exposes something that's a-ok for the sanitized data, but a problem for the unsanitized data.
+    """
+    client = bigquery.Client()
+    
+    partition = date.strftime("%Y%m%d")
+
+    # For idempotency, we want to overwrite data on daily partitions
+    # But the BQ role granted to the sanitizer service account does not include creating tables
+    # Which WRITE_TRUNCATE to a partition requires, so the hack is to
+    # Delete existing data from today before insertion of data from today.
+    
+    deletion_target = f'{sample_table_id}${partition}'
+    client.delete_table(deletion_target, not_found_ok=True)
+    
+    # Specify a (partial) schema. All columns are always written to the
+    # table. The schema is used to assist in data type definitions.
+    schema=[
+        # Specify the type of columns whose type cannot be auto-detected (particularly "object")
+            bigquery.SchemaField("request_id", bigquery.enums.SqlTypeNames.STRING),
+            bigquery.SchemaField("session_id", bigquery.enums.SqlTypeNames.STRING),
+            bigquery.SchemaField("sequence_no", bigquery.enums.SqlTypeNames.STRING),
+            bigquery.SchemaField("query", bigquery.enums.SqlTypeNames.STRING),
+            bigquery.SchemaField("country", bigquery.enums.SqlTypeNames.STRING),
+            bigquery.SchemaField("region", bigquery.enums.SqlTypeNames.STRING),
+            bigquery.SchemaField("dma", bigquery.enums.SqlTypeNames.STRING),
+            bigquery.SchemaField("form_factor", bigquery.enums.SqlTypeNames.STRING),
+            bigquery.SchemaField("browser", bigquery.enums.SqlTypeNames.STRING),
+            bigquery.SchemaField("os_family", bigquery.enums.SqlTypeNames.STRING)
+        ]
+
+    destination_table = bigquery.Table(sample_table_id, schema=schema)
+    job = client.insert_rows_from_dataframe(
+        table=destination_table, dataframe=dataframe
+    )
+    print(job)  # Wait for the job to complete.
+
 
 def record_job_metadata(status, started_at, ended_at, destination_table, total_run=0, total_rejected=0, run_data=None, language_data=None, failure_reason=None, implementation_notes=None):
     """
