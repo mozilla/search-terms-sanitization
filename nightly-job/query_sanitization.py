@@ -110,39 +110,6 @@ async def mutate_risk(pii_risk, run_data, language_data, idx, query_info, census
             run_data['sum_terms_containing_us_census_surname'] += 1
             return
         
-PREAPPROVED_QUERIES_FROM_ALLOWLIST = """
-WITH approved_terms as (
-    SELECT
-    -- Each keyword should only appear once, but we add DISTINCT for protection
-    -- in downstream joins in case the suggestions file has errors.
-    DISTINCT query
-    FROM
-        `moz-fx-data-shared-prod.search_terms_derived.remotesettings_suggestions_v1`
-    CROSS JOIN
-    UNNEST(keywords) AS query
-    )
-
-SELECT
-    search_logs.timestamp AS timestamp,
-    search_logs.jsonPayload.fields.rid AS request_id,
-    search_logs.jsonPayload.fields.session_id AS session_id,
-    search_logs.jsonPayload.fields.sequence_no AS sequence_no,
-    search_logs.jsonPayload.fields.query AS query,
-    -- Merino currently injects 'none' for missing geo fields.
-    NULLIF(search_logs.jsonPayload.fields.country, 'none') AS country,
-    NULLIF(search_logs.jsonPayload.fields.region, 'none') AS region,
-    NULLIF(search_logs.jsonPayload.fields.dma, 'none') AS dma,
-    search_logs.jsonPayload.fields.form_factor AS form_factor,
-    search_logs.jsonPayload.fields.browser AS browser,
-    search_logs.jsonPayload.fields.os_family AS os_family
-FROM `suggest-searches-prod-a30f.logs.stdout` AS search_logs
-INNER JOIN approved_terms ON search_logs.jsonPayload.fields.query=approved_terms.query
-WHERE
-    jsonPayload.type = "web.suggest.request"
-    --Specifically get the previous day's data
-    AND timestamp >= DATE_ADD(CURRENT_TIMESTAMP(), INTERVAL -1 DAY)
-    AND DATE(timestamp) < CURRENT_DATE()
-"""      
 
 UNSANITIZED_QUERIES_FOR_ANALYSIS_SQL = """
 WITH approved_terms as (
@@ -168,11 +135,11 @@ SELECT
     NULLIF(search_logs.jsonPayload.fields.dma, 'none') AS dma,
     search_logs.jsonPayload.fields.form_factor AS form_factor,
     search_logs.jsonPayload.fields.browser AS browser,
-    search_logs.jsonPayload.fields.os_family AS os_family
+    search_logs.jsonPayload.fields.os_family AS os_family,
+    approved_terms.query IS NOT NULL AS present_in_allow_list
 FROM `suggest-searches-prod-a30f.logs.stdout` AS search_logs
 LEFT JOIN approved_terms on search_logs.jsonPayload.fields.query = approved_terms.query
-WHERE approved_terms.query IS NULL
-AND
+WHERE 
     jsonPayload.type = "web.suggest.request"
     --Specifically get the previous day's data
     AND timestamp >= DATE_ADD(CURRENT_TIMESTAMP(), INTERVAL -1 DAY)
