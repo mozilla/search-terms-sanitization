@@ -44,7 +44,7 @@ async def run_sanitation(args):
 
             pii_in_query_mask, run_data, language_data = await detect_pii(unsanitized_unallowlisted_terms['query'], census_surnames)
             sanitized_page = unsanitized_unallowlisted_terms.loc[~numpy.array(pii_in_query_mask)] # ~ reverses the mask so we get the queries WITHOUT PII in them
-            total_deemed_sanitary += sanitized_page.shape[0]
+            total_deemed_sanitary += (sanitized_page.shape[0] + allow_listed_terms_page.shape[0])
         
             summary_language_data = dict(functools.reduce(operator.add,
                             map(collections.Counter, [summary_language_data, language_data])))
