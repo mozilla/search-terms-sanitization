@@ -9,6 +9,13 @@ import re
 import json
 import string
 
+## THIS IS A STAGING LOCATION FOR THIS WORK
+## CHANGING IT HERE WILL NOT CHANGE THE ACTUAL FUNCTIONALITY IN PROD
+## THIS IS WHERE THE PROD VERSION LIVES:
+## https://github.com/mozilla/docker-etl/blob/main/jobs/search-term-data-validation/src
+## PLEASE MAKE CHANGES TO THAT, AND THEN MAKE MATCHING CHANGES IN THIS ONE
+
+
 def calculate_data_validation_metrics(metadata_source, languages_source): 
     """
     Calculate metrics for determining whether our search volume is changing in ways that might invalidate our current sanitization model.
