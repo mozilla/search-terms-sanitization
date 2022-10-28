@@ -261,7 +261,7 @@ def export_sample_to_bigquery(dataframe, sample_table_id, date):
     print(job)  # Wait for the job to complete.
 
 
-def record_job_metadata(status, started_at, ended_at, destination_table, total_run=0, total_rejected=0, run_data=None, language_data=None, failure_reason=None, implementation_notes=None):
+def record_job_metadata(status, started_at, ended_at, destination_table, total_run=0, total_allow_listed=0, total_rejected=0, run_data=None, language_data=None, failure_reason=None, implementation_notes=None):
     """
     Record metadata on a sanitation job run. There are two types of data:
     
@@ -276,6 +276,7 @@ def record_job_metadata(status, started_at, ended_at, destination_table, total_r
     - ended_at: When the job ended
     - destination_table: where to log the job info
     - total_run: number of search terms evaluated for sanitation
+    - total_allow_listed: number of search terms automatically deemed sanitary/saveable by appearing in an allow list
     - total_rejected: number of search terms deemed at risk of containing personally identifiable information
     - run_data: a Python dictionary with a variety of aggregate metrics in it about what was in the terms run
     - language_data: a Python dictionary counting the language categorizations for the terms run
@@ -294,6 +295,7 @@ def record_job_metadata(status, started_at, ended_at, destination_table, total_r
         {
          u"status": status, 
          u"total_search_terms_analyzed": total_run, 
+         u"total_search_terms_appearing_in_allow_list": total_allow_listed, 
          u"total_search_terms_removed_by_sanitization_job": total_rejected, 
          u"contained_numbers": run_data.get('num_terms_containing_numeral', 0),
          u"contained_at": run_data.get('num_terms_containing_at', 0),

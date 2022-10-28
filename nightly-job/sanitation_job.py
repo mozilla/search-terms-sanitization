@@ -25,13 +25,14 @@ async def run_sanitation(args):
 
     try:
         total_run = 0
+        total_allow_listed = 0
         total_deemed_sanitary = 0
         summary_run_data = {}
         summary_language_data = {}
         yesterday = datetime.utcnow().date() - timedelta(days=1)
-        
+    
         data_validation_sample = pd.DataFrame()
-
+    
         unsanitized_search_term_stream = stream_search_terms() # load unsanitized search terms
         for raw_page in unsanitized_search_term_stream:
             total_run += raw_page.shape[0]
@@ -44,7 +45,8 @@ async def run_sanitation(args):
 
             pii_in_query_mask, run_data, language_data = await detect_pii(unsanitized_unallowlisted_terms['query'], census_surnames)
             sanitized_page = unsanitized_unallowlisted_terms.loc[~numpy.array(pii_in_query_mask)] # ~ reverses the mask so we get the queries WITHOUT PII in them
-            total_deemed_sanitary += (sanitized_page.shape[0] + allow_listed_terms_page.shape[0])
+            total_allow_listed += allow_listed_terms_page.shape[0]
+            total_deemed_sanitary += (sanitized_page.shape[0] + total_allow_listed)
         
             summary_language_data = dict(functools.reduce(operator.add,
                             map(collections.Counter, [summary_language_data, language_data])))
@@ -60,12 +62,10 @@ async def run_sanitation(args):
     
         data_validation_sample = data_validation_sample.drop(columns=['present_in_allow_list'])
         export_sample_to_bigquery(dataframe=data_validation_sample, sample_table_id=args.unsanitized_term_sample_destination, date=yesterday)
+    
+        implementation_notes = "Run with a page_size of UNLIMITED from script" 
+        record_job_metadata(status='SUCCESS', started_at=start_time, ended_at=end_time, destination_table=args.job_reporting_destination, total_run=total_run, total_allow_listed=total_allow_listed, total_rejected=total_run - total_deemed_sanitary, run_data=summary_run_data, language_data=summary_language_data, implementation_notes=implementation_notes)
 
-        implementation_notes = "Run with a page_size of UNLIMITED from script"
-        record_job_metadata(status='SUCCESS', started_at=start_time, ended_at=end_time,
-                            destination_table=args.job_reporting_destination, total_run=total_run,
-                            total_rejected=total_run - total_deemed_sanitary, run_data=summary_run_data,
-                            language_data=summary_language_data, implementation_notes=implementation_notes)
     except Exception as e:
         # TODO: Make this more robust in actual failure cases
         # Maybe include the reason? Or should the logs be elsewhere for that
