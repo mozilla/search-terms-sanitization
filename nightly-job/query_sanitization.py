@@ -32,7 +32,7 @@ async def detect_pii(series, census_surnames):
     language_data = {}
     
     # spaCy chokes when asked to evaluate 'None' instead of a text string
-    series.replace(None, "FX_RECEIVED_EMPTY_QUERY", inplace=True)
+    series.fillna("FX_RECEIVED_EMPTY_QUERY", inplace=True)
     texts = list(series)
     tasks = []
     
