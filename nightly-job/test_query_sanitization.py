@@ -5,6 +5,15 @@ import pandas as pd
 FAKE_CENSUS_SURNAMES = ["troy", "stuckey", "klukas", "burwei", "zeber", "reid", "dawson"] 
 
 @pytest.mark.asyncio
+async def test_detect_pii_replaces_none():
+    """
+    spaCy hates it when we pass `None` instead of a string for analysis, apparently.
+    This test ensures that our function doesn't error out on that edge case.
+    """    
+    pii_risk, _, _ = await detect_pii(pd.Series([None]), FAKE_CENSUS_SURNAMES)
+    assert pii_risk == [False] 
+
+@pytest.mark.asyncio
 async def test_detect_pii_removes_numerals():
     """
     Currently, we use rules to determine which search terms 
