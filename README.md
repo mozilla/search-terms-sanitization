@@ -35,3 +35,4 @@ The nightly sanitization job writes data to
 # Related artifacts
 * [Search Terms Sanitization Proposal](https://docs.google.com/document/d/1juZjL1GusXNAFT3Zmzpi8zDuUH3kNEnjeQ1Hp-UQoSg/edit): lists goals, requirements, high-level sanitization strategies
 * [Technical report](https://docs.google.com/document/d/1UbQpiWadpMCzSdis3y1Mk7yzpW74POx_71KQ8QzQFyQ/edit): Evaluation of PII removal strategies.
+test
