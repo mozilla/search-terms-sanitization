@@ -4,6 +4,8 @@ from pathlib import Path
 import gzip
 from io import StringIO
 import json
+import re
+import warnings
 
 import pandas as pd
 import requests
@@ -201,3 +203,158 @@ def create_combined_df(data_dir):
     assert df_combined.isna().sum().sum() == 0
 
     df_combined.to_pickle(data_dir / CATEGORY_DF_PKL)
+
+
+def find_matching_categories(cat_df, catlist=None, regex=None, nonempty=False):
+    """Find a list of visible categories matching a list or regex.
+
+    This can be used to build a list of categories from seeds.
+
+    cat_df: the category index DataFrame
+    catlist: a list of exact category names
+    regex: a regex to match category names
+    nonempty: should empty categories (no pages or subcategories) be removed?
+
+    Returns a subset of the category index DF corresponding to the search terms
+    with additional columns:
+    - `seed` gives the portion of the category name that was matched
+    - `has_parent_in_list` indicates whether the category has a parent that is also in the result set
+    """
+    # First find the matching rows in the category info table
+    cat_df_visible = cat_df.query("~hidden")
+    search_results = []
+    if catlist is not None:
+        search_results.append(
+            cat_df_visible[cat_df_visible["name"].isin(catlist)].assign(
+                seed=lambda d: d["name"]
+            )
+        )
+    if regex is not None:
+        re_matches = cat_df_visible["name"].str.extract(
+            f"({regex})", flags=re.IGNORECASE
+        )[0]
+        search_results.append(
+            cat_df_visible[re_matches.notna()].assign(seed=re_matches)
+        )
+    matching_cats = pd.concat(search_results, ignore_index=False)
+    matching_cats = matching_cats[~matching_cats.index.duplicated()]
+
+    # Some categories have no member pages or subcategories. Prune if requested
+    if nonempty:
+        matching_cats = matching_cats.query("num_pages + num_subcats > 0")
+
+    # Remove unnecessary columns, as we are only working with visible categories
+    matching_cats = matching_cats.drop(columns=["hidden", "parents"])
+
+    # For each category in the list, check whether one of its parents is also in the list
+    matching_cats_parents = find_parents_listed(matching_cats)
+    matching_cats["has_parent_in_list"] = matching_cats_parents.groupby("key").agg(
+        {"parent_in_list": "any"}
+    )
+
+    return matching_cats
+
+
+def find_parents_listed(cats):
+    """Expand parents for a list of categories and flag parents which are also in the list.
+
+    This is useful when using `find_matching_categories` to search for categories
+    on a topic. A regex may match both a parent category and its subcategory, in
+    which case only the parent may be needed.
+
+    cats: a subset of the category index with columns `name`, `parents_visible`.
+
+    Returns a DF exploding the parents for each category name in `cats`, with
+    column `parent_in_list` indicating whether each parent was also listed in
+    `cats`.
+    """
+    return (
+        pd.merge(
+            cats["name"], cats["parents_visible"].explode().rename("parent"), on="key"
+        )
+        .reset_index()
+        .merge(
+            cats["name"],
+            left_on="parent",
+            right_on="name",
+            how="left",
+            suffixes=("", "_in_list"),
+        )
+        .assign(parent_in_list=lambda d: d["name_in_list"].notna())
+        .drop(columns="name_in_list")
+        .set_index("key")
+    )
+
+
+def category_bfs(cat_df, cat_subset, ignore_cats=None, ignore_re=None, max_level=None):
+    """Given a set of categories, walk the graph of category->subcategory links for each one.
+
+    This will discover all subcategories belonging to a set of categories using BFS.
+    Certain subcategories can be ignored, and the depth of exploration can be limited.
+
+    cat_df: the full category index DataFrame
+    cat_subset: a subset of the category index with columns `name`, `subcats_visible`, `seed`
+        as returned by `find_matching_categories()`.
+    ignore_cats: a list of exact category names to exclude
+    ignore_re: a regex to exclude
+    max_level: if supplied, stop after this level
+
+    Returns a DF with columns:
+    - name: the category name discovered
+    - seed: the original seed which generated the top-level category containing this one
+    - parent: the immediate parent that led to this category
+    - level: the number of steps from the seed category to this one
+    """
+    curr_cat_links = cat_subset
+    # Apply exclusions
+    if ignore_cats:
+        curr_cat_links = curr_cat_links[~curr_cat_links["name"].isin(ignore_cats)]
+    if ignore_re:
+        with warnings.catch_warnings():
+            # Ignore warning about matching groups.
+            warnings.simplefilter("ignore", UserWarning)
+            curr_cat_links = curr_cat_links[
+                ~curr_cat_links["name"].str.contains(ignore_re, case=False)
+            ]
+    bl_rows = (
+        curr_cat_links[["name", "seed"]]
+        .assign(parent=None, level=0)
+        .reset_index(drop=True)
+    )
+    i = 0
+
+    while len(curr_cat_links) > 0:
+        i += 1
+        if max_level and i > max_level:
+            break
+        print(f"Level: {i}", end="\r")
+        # Next level of categories are visible subcategories of current list
+        new_cats = (
+            curr_cat_links["subcats_visible"]
+            .explode()
+            .to_frame()
+            .join(curr_cat_links[["name", "seed"]])
+            .reset_index(drop=True)
+            .query("subcats_visible.notna()")
+        )
+        # Apply exclusions
+        if ignore_cats:
+            new_cats = new_cats[~new_cats["subcats_visible"].isin(ignore_cats)]
+        if ignore_re:
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", UserWarning)
+                new_cats = new_cats[
+                    ~new_cats["subcats_visible"].str.contains(ignore_re, case=False)
+                ]
+
+        # Drop previously seen categories.
+        bl_new = new_cats.rename(
+            columns={"subcats_visible": "name", "name": "parent"}
+        ).assign(level=i)
+        bl_rows = pd.concat([bl_rows, bl_new], ignore_index=True).drop_duplicates(
+            subset="name"
+        )
+        curr_cat_list = bl_rows.query(f"level == {i}")[["name", "seed"]]
+        curr_cat_links = curr_cat_list.merge(cat_df, on="name", how="left")
+
+    return bl_rows
