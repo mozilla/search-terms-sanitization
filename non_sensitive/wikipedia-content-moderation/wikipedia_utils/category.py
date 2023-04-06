@@ -12,10 +12,6 @@ import requests
 import yaml
 
 
-# Data files for Wikipedia categories are stored in ./category_data
-DATA_DIR = Path("category_data")
-DATA_DIR.mkdir(parents=True, exist_ok=True)
-
 CATEGORY_RDF_FILE = "category_index.ttl.gz"
 CATEGORY_INFO_JSON = "category_info.json.gz"
 CATEGORY_LINKAGE_JSON = "category_linkage.json.gz"
