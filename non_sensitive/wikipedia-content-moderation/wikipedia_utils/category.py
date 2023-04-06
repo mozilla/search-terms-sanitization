@@ -9,6 +9,7 @@ import warnings
 
 import pandas as pd
 import requests
+import yaml
 
 
 # Data files for Wikipedia categories are stored in ./category_data
@@ -205,6 +206,51 @@ def create_combined_df(data_dir):
     df_combined.to_pickle(data_dir / CATEGORY_DF_PKL)
 
 
+def load_blocklist_seeds(seed_file):
+    """Load a YAML file listing category seeds for various topics.
+
+    seed_file: path to the file
+
+    Expects a file with the format
+    ```
+    blocklist:
+      - topic: <topic_key>
+        seed_categories:
+          - <exact category name>
+        seed_re:
+          - <regex to match category names>
+        ignore_categories:
+          - <exact category name>
+        ignore_re:
+          - <regex to match category names>
+        max_level: <max depth to search category digraph>
+    ```
+
+    Returns a dict with the format
+    ```
+    {
+      <topic>: {
+        "topic": <topic>,
+        "seed_categories": [...],
+        "seed_re": [...],
+        "ignore_categories": [...],
+        "ignore_re": [...],
+        "max_level": n,
+      },
+      ...
+    }
+    ```
+    for the blocklist topics, where all dict entries aside from `topic` are optional.
+    """
+    with open(seed_file) as f:
+        seed_list = yaml.safe_load(f)
+
+    # Curently only working with blocklist
+    seed_list = seed_list["blocklist"]
+
+    return {s["topic"]: s for s in seed_list}
+
+
 class CategoryIndex:
     """Wrapper for the prepared category index providing exploration functionality.
 
@@ -374,3 +420,197 @@ class CategoryIndex:
             curr_cat_links = curr_cat_list.merge(self.cat_df, on="name", how="left")
 
         return bl_rows
+
+    def build_category_list_for_topic(self, topic_seeds, top_level_seeds=True):
+        """Build category list for a topic from the given seeds.
+
+        This is done by identifying all Wikipedia categories matched by the seeds
+        and searching through all of their subcategories.
+
+        topic_seeds: a topic dict as returned by `load_blocklist_seeds()`
+        top_level_seeds: seeds could match both a subcategory and its parent. If `True`,
+            only keep the highest-level categories (with no matched parent) when identifying
+            categories to search from.
+
+        Returns a DF listing all categories generated from the seeds with columns:
+        - name: category name
+        - seed: the individual seed entry which generated the top-level category containing this one
+        - parent: the immediate parent that led to this category
+        - level: the number of steps from the seed category to this one
+        - topic: the topic identifier provided in the input
+        """
+        seed_cats = topic_seeds.get("seed_categories")
+        seed_re = topic_seeds.get("seed_re")
+        if seed_re:
+            # Combine to a single regex
+            seed_re = "|".join(seed_re)
+        ignore_cats = topic_seeds.get("ignore_categories")
+        ignore_re = topic_seeds.get("ignore_re")
+        if ignore_re:
+            # Combine to a single regex
+            ignore_re = "|".join(ignore_re)
+        max_level = topic_seeds.get("max_level")
+
+        include_cats = self.find_matching_categories(catlist=seed_cats, regex=seed_re)
+        if top_level_seeds:
+            include_cats = include_cats.query("~has_parent_in_list")
+        all_cats = self.category_bfs(
+            include_cats,
+            ignore_cats=ignore_cats,
+            ignore_re=ignore_re,
+            max_level=max_level,
+        )
+        all_cats["topic"] = topic_seeds["topic"]
+
+        return all_cats
+
+    def build_full_category_list(self, seed_dict, output_csv):
+        """Build a full category list from seeds across multiple topics.
+
+        This is done by building a category list for each topic and combining.
+        Duplicated categories, which may have arisen from multiple topics, are removed.
+        The final table is written to file in CSV format.
+
+        seed_dict: a seed dict as returned by `load_blocklist_seeds()`
+        output_csv: path to the CSV file to write
+        """
+        # Exclusions should apply globally.
+        all_ignore_cats = []
+        all_ignore_re = []
+        for d in seed_dict.values():
+            all_ignore_cats.extend(d.get("ignore_categories", []))
+            all_ignore_re.extend(d.get("ignore_re", []))
+
+        all_ignore_cats = list(set(all_ignore_cats))
+        all_ignore_re = list(set(all_ignore_re))
+
+        cat_list_results = []
+        for d in seed_dict.values():
+            topic_seeds = dict(d)
+            topic_seeds["ignore_categories"] = all_ignore_cats
+            topic_seeds["ignore_re"] = all_ignore_re
+            cat_list_results.append(self.build_category_list_for_topic(topic_seeds))
+
+        full_list = pd.concat(cat_list_results, ignore_index=True)
+        # Deduplicate, in case the same categories arose for multiple topics
+        full_list = full_list.drop_duplicates(subset="name", ignore_index=True)
+
+        full_list.to_csv(output_csv, index=False)
+
+
+def compare_categories_lists(
+    prev_cat_list, new_cat_list, differing_only=True, topic=None
+):
+    """Present two category lists in a convenient format for exploring differences.
+
+    prev_cat_list: the previous category list, as returned by `build_full_category_list()`
+    new_cat_list: the new category list, as returned by `build_full_category_list()`
+    differing_only: should the output show only categories that differ (`True`) or all categories (`False`)
+    topic: a single topic to optionally restrict comparison to
+
+    Returns a DF with 1 row per (topic, category name) showing info from previous and new lists
+        side by side.
+    """
+
+    def clear_row(r):
+        # When doing outer join, fill in entries that are missing from one side with placeholder
+        if r["type_previous"] != "previous":
+            for x in r.index:
+                if x.endswith("previous"):
+                    r[x] = "--"
+        if r["type_new"] != "new":
+            for x in r.index:
+                if x.endswith("_new"):
+                    r[x] = "--"
+        return r
+
+    def diff_type(r):
+        # Indicator of the difference type (add/remove/change)
+        if r["seed_previous"] == "--":
+            return "added"
+        if r["seed_new"] == "--":
+            return "removed"
+        for c in ["seed", "parent", "level"]:
+            if r[c + "_previous"] != r[c + "_new"]:
+                return "changed"
+        return ""
+
+    combined_cat_list = (
+        pd.concat(
+            [prev_cat_list.assign(type="previous"), new_cat_list.assign(type="new")],
+            ignore_index=True,
+        )
+        # Replace NaNs with "" for clearer display
+        .assign(parent=lambda d: d["parent"].fillna(""))
+    )
+    comp_df = (
+        # Create side-by-side view of previous and new info for each category
+        pd.merge(
+            combined_cat_list.query("type == 'previous'"),
+            combined_cat_list.query("type == 'new'"),
+            on=["name", "topic"],
+            how="outer",
+            suffixes=["_previous", "_new"],
+        )
+        # Level was converted to float because of NaNs - convert back to int
+        .assign(
+            level_previous=lambda d: d["level_previous"].fillna(-1).astype(int),
+            level_new=lambda d: d["level_new"].fillna(-1).astype(int),
+        )
+        # Fill in entries missing from one side with placeholder
+        .apply(clear_row, axis="columns")
+        .drop(columns=["type_previous", "type_new"])
+        # Add indicator of difference type
+        .assign(diff=lambda d: d.apply(diff_type, axis="columns"))
+        .sort_values(["topic", "level_previous", "name"])
+    )
+    # Sometimes a category appears under a different topic in the new list.
+    # The outer join will produce duplicated rows in this case.
+    comp_df.loc[comp_df.duplicated(subset="name", keep=False), "diff"] = "moved"
+
+    if topic:
+        comp_df = comp_df[comp_df["topic"] == topic].drop(columns="topic")
+    if differing_only:
+        comp_df = comp_df[
+            (comp_df["seed_previous"].astype(str) != comp_df["seed_new"].astype(str))
+            | (
+                comp_df["parent_previous"].astype(str)
+                != comp_df["parent_new"].astype(str)
+            )
+            | (
+                comp_df["level_previous"].astype(str)
+                != comp_df["level_new"].astype(str)
+            )
+        ]
+
+    return comp_df
+
+
+def style_diff(diff_df):
+    """Apply styling to highlight differences in the list comparison.
+
+    diff_df: a DF as returned by `compare_categories_lists()`
+
+    Displays a DF in the notebook with colouring applied.
+    """
+
+    def diff_style(r):
+        styles = pd.Series(None, index=r.index)
+        if r["seed_previous"] == "--":
+            for x in ["name", "seed_new", "parent_new", "level_new"]:
+                styles[x] = "background-color: lightgreen"
+        elif r["seed_new"] == "--":
+            for x in ["name", "seed_previous", "parent_previous", "level_previous"]:
+                styles[x] = "background-color: lightsalmon"
+        else:
+            for c in ["seed", "parent", "level"]:
+                cc = c + "_previous"
+                cn = c + "_new"
+                if r[cc] != r[cn]:
+                    styles[cc] = "background-color: gold"
+                    styles[cn] = "background-color: gold"
+        if r["diff"] == "moved":
+            styles["name"] = "background-color: cyan"
+        return styles
+
+    return diff_df.style.apply(diff_style, axis="columns")

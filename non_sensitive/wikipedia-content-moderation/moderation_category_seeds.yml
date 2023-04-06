@@ -1,0 +1,133 @@
+blocklist:
+  # Profanity in different languages
+  - topic: profanity
+    seed_categories:
+      # Includes types of profanity, specific words
+      - Profanity
+    ignore_categories:
+      # Books/film/TV shows about or involving profanity
+      - Works about profanity
+
+  # Pejorative terms for different groups
+  - topic: pejoratives
+    seed_re:
+      # Pejorative terms, slang
+      - \bslurs
+      - \bpejorative
+    ignore_categories:
+      # Pulls in non-objectionable topics about a culture
+      - Barbarians
+    ignore_re:
+      # Pulls in non-objectionable topics about a culture
+      - \beskimo
+
+  # Cruelty & torture
+  - topic: cruelty
+    seed_categories:
+      # Methods of torture, mutilation, events involving torture, torturers
+      - Torture               
+    ignore_categories:
+      # Pulls in non-objectionable topics:
+      # Relating to history & culture
+      - Castrated people
+      # Relates to history
+      - Operation Condor
+      # Relates to religion
+      - Crucifixion
+      # Relates to sports, medical/prosthetics, etc
+      - Amputations
+      # Fiction
+      - Fictional torturers
+      - Works about torture
+      # Activism & victims
+      - Guantanamo Bay detention camp
+      - People of the Dirty War
+    ignore_re:
+      # Activism & victims
+      - \banti-torture\b
+      - \btorture victims?\b
+      - \bhuman rights activ
+
+  # Child abuse
+  - topic: child_abuse
+    seed_categories:
+      # Types of abuse, events and incident
+      - Child abuse
+    ignore_categories:
+      # Law & activism
+      - Child abuse law
+      - Child abuse-related organizations
+      - Anti-pedophile activism
+      # Sensitive but not objectionable
+      - Child labour
+      - Displacement of indigenous children
+      - School bullying
+      - QAnon
+      # Books/TV/film: pulls in non-objectionable works, eg. horror movies, Hunger Games, mythology
+      - Works about child abuse
+      - Feral children
+      - Fiction about child murder
+      - Filicides
+      - Fictional murderers of children
+      - Child sacrifice
+
+  # Sexually explicit & pornography
+  - topic: sexually_explicit
+    seed_categories:
+      # Sex acts, pornography, erotica, prostitution.
+      # There is no good overarching category. These were chosen as the more explicit subcategories of "Human sexuality".
+      # However, that category also includes many non-objectionable topics, eg. health, society.
+      - Sex manuals
+      - Incest
+      - Sexual emotions
+      - Prostitution
+      - Sexuality-related lists
+      - Machine sex
+      - Orgasm
+      - Sexual fetishism
+      - Pornography
+      - Paraphilias
+      - Sexual slang
+      - Personal lubricants
+      - Sexual fantasies
+      - Sex toys
+      - Sexual violence
+      - Sexual acts
+    seed_re:
+      - \bpornograph
+      - \berotic
+    ignore_categories:
+      # Books/films/TV: non-objectionable
+      - One Thousand and One Nights
+      # Relates to mythology
+      - Aphrodite
+      - Game of Thrones
+        # False positives
+      - Erotic Liquid Culture members
+      - Swedish Erotica members
+    ignore_re:
+      # Law & activism
+      - \banti\W(child )?porn
+      - \blaw.+\bporn
+      - \bporn.+\blaw
+      - \blaw.+\bprostitut
+      - \bprostitut.+\blaw
+      - \banti\Wprostitut
+      # Books/films/TV: non-objectionable
+      - \bsex comedy\b
+      # Relates to mythology
+      - \bmytholog
+      # False positives
+      - \bNew Pornographers\b
+
+  # Hateful ideologies
+  - topic: hateful_ideologies
+    seed_categories:
+      # White nationalism, nazism, fascism, alt-right, symbols, people, events
+      - White nationalism
+    ignore_categories:
+      - Works about apartheid
+    # Search cut off after level 4 to avoid branching into more general topics, eg. US civil war
+    # Because of the large number of subcategories, cutting off is a reasonable
+    # alternative to enumerating inclusions & exclusions
+    max_level: 4
