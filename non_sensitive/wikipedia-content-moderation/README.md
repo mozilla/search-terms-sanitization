@@ -28,7 +28,7 @@ pip install -r requirements.txt
 
 - Run the notebook `build_blocklist.ipynb`. This writes a new blocklist CSV to `category_data/blocklist_cats.csv`. This may differ from the current blocklist if the Wikipedia category graph has changed. The notebook also presents tools for comparing the new blocklist table to the current one. When updating the current blocklist to the new one, overwrite the main CSV file:
 ```bash
-cp category_data/blocklist_cats.csv ./blocklist_cats.csv
+cp category_data/blocklist_cats_new.csv ./blocklist_cats.csv
 ```
 This serves as a reference for this repo but doesn't affect any production systems.
 
