@@ -1,4 +1,5 @@
-pandas
+pandas[output_formatting]
 numpy
 requests
 tqdm
+pyyaml
