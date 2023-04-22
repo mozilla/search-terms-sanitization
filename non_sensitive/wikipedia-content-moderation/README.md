@@ -13,6 +13,7 @@ The full list of categories is built by finding all categories matching the seed
 
 - The current list of seeds is maintained in [moderation_category_seeds.yml](./moderation_category_seeds.yml).
 - The current list of blocked categories is available in [blocklist_cats.csv](./blocklist_cats.csv).
+- The current list of blocked pages can be downloaded from [Google Drive](https://drive.google.com/file/d/1pLne2__siypi9JjeuKn_q8047VZvV8WK/view).
 
 
 Using the tools
