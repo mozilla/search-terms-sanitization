@@ -143,6 +143,8 @@ FROM `suggest-searches-prod-a30f.logs.stdout` AS search_logs
 LEFT JOIN approved_terms on search_logs.jsonPayload.fields.query = approved_terms.query
 WHERE 
     jsonPayload.type = "web.suggest.request"
+    -- Trim empty queries
+    AND TRIM(search_logs.jsonPayload.fields.query) != ""
     --Specifically get the previous day's data
     AND timestamp >= DATE_ADD(CURRENT_TIMESTAMP(), INTERVAL -1 DAY)
     AND DATE(timestamp) < CURRENT_DATE()
@@ -162,6 +164,33 @@ def stream_search_terms():
     df_generator = query_job.result().to_dataframe_iterable()
     # df_generator = query_job.result(page_size=75000).to_dataframe_iterable()
     return df_generator
+
+
+UNSANITIZED_QUERY_STATS = """
+SELECT
+    COUNT(DISTINCT search_logs.jsonPayload.fields.rid) AS total_term_count,
+    COUNTIF(TRIM(search_logs.jsonPayload.fields.query) = "") AS total_blank_count,
+FROM `suggest-searches-prod-a30f.logs.stdout` AS search_logs
+WHERE 
+    jsonPayload.type = "web.suggest.request"
+    --Specifically get the previous day's data
+    AND timestamp >= DATE_ADD(CURRENT_TIMESTAMP(), INTERVAL -1 DAY)
+    AND DATE(timestamp) < CURRENT_DATE()
+"""
+
+
+def get_initial_term_stats():
+    """
+    Query the search logs table to get a total term count and total blank query count.
+
+    Arguments: None
+
+    Returns A dataframe
+    """
+    client = bigquery.Client()
+    query_job = client.query_and_wait(UNSANITIZED_QUERY_STATS)
+    return query_job.to_dataframe()
+
 
 def export_search_queries_to_bigquery(dataframe, destination_table_id, date):
     """
@@ -208,7 +237,7 @@ def export_search_queries_to_bigquery(dataframe, destination_table_id, date):
     job = client.insert_rows_from_dataframe(
         table=destination_table, dataframe=dataframe
     )
-    print(job)  # Wait for the job to complete.
+    print("SANITIZED INSERT JOB", job)  # Wait for the job to complete.
     
 def export_sample_to_bigquery(dataframe, sample_table_id, date):
     """
@@ -263,7 +292,7 @@ def export_sample_to_bigquery(dataframe, sample_table_id, date):
     print(job)  # Wait for the job to complete.
 
 
-def record_job_metadata(status, started_at, ended_at, destination_table, total_run=0, total_allow_listed=0, total_rejected=0, run_data=None, language_data=None, failure_reason=None, implementation_notes=None):
+def record_job_metadata(status, started_at, ended_at, destination_table_id, total_run=0, total_allow_listed=0, total_rejected=0, run_data=None, language_data=None, failure_reason=None, implementation_notes=None, total_terms_inclusive=0, total_blank=0):
     """
     Record metadata on a sanitation job run. There are two types of data:
     
@@ -295,10 +324,12 @@ def record_job_metadata(status, started_at, ended_at, destination_table, total_r
 
     rows_to_insert = [
         {
-         u"status": status, 
+         u"status": status,
+         u"total_search_terms": int(total_terms_inclusive),
          u"total_search_terms_analyzed": total_run, 
          u"total_search_terms_appearing_in_allow_list": total_allow_listed, 
          u"total_search_terms_removed_by_sanitization_job": total_rejected, 
+         u"contained_blank": int(total_blank),
          u"contained_numbers": run_data.get('num_terms_containing_numeral', 0),
          u"contained_at": run_data.get('num_terms_containing_at', 0),
          u"contained_name": run_data.get('num_terms_name_detected', 0),
@@ -313,7 +344,7 @@ def record_job_metadata(status, started_at, ended_at, destination_table, total_r
          u"implementation_notes": implementation_notes
         },
     ]
-    errors = client.insert_rows_json(destination_table, rows_to_insert)
+    errors = client.insert_rows_json(destination_table_id, rows_to_insert)
     if errors == []:
         print("New row representing job run successfully added.")
     else:
