@@ -4,16 +4,6 @@ orbs:
   gcp-gcr: circleci/gcp-gcr@0.12.0
   python: circleci/python@2.1.1
 
-jobs:
-  test:
-    executor: 
-      name: python
-      tag: '3.10'
-    steps:
-      - python/test:
-          app-dir: nightly-job/
-          test-tool-args: --asyncio-mode strict
-
 workflows:
   search-terms-sanitization:
     jobs:
@@ -27,4 +17,7 @@ workflows:
           filters:
             branches:
               only: main
-      - test
+      - python/test:
+          version: '3.10'
+          app-dir: nightly-job/ 
+          test-tool-args: --asyncio-mode strict 
