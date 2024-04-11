@@ -298,7 +298,7 @@ def export_sample_to_bigquery(dataframe, sample_table_id, date):
     """
     client = bigquery.Client()
     
-    partition = date.strftime("%Y%m%d")
+    partition = datetime.fromisoformat(date).strftime("%Y%m%d")
 
     # For idempotency, we want to overwrite data on daily partitions
     # But the BQ role granted to the sanitizer service account does not include creating tables
