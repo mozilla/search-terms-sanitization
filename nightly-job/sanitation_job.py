@@ -95,10 +95,17 @@ async def run_sanitation(args):
 
     except Exception as e:
         record_job_metadata(
+<<<<<<< HEAD
             status='FAILURE', 
             started_at=start_time, 
             ended_at=datetime.now(UTC),
             destination_table_id=args.job_reporting_destination, 
+=======
+            status='FAILURE',
+            started_at=start_time,
+            ended_at=datetime.utcnow(),
+             destination_table_id=args.job_reporting_destination,
+>>>>>>> a9c12df (update test run tables to use the new table with the added fields)
             failure_reason=str(e)
         )
         raise e
