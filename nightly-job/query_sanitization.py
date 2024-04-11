@@ -6,6 +6,7 @@ import asyncio
 import re
 import json
 import string
+import os
 
 
 async def detect_pii(series, census_surnames):
@@ -305,7 +306,7 @@ def record_job_metadata(status, started_at, ended_at, destination_table_id, tota
     - status: How the job finished
     - started_at: When the job began
     - ended_at: When the job ended
-    - destination_table: where to log the job info
+    - destination_table_id: where to log the job info
     - total_run: number of search terms evaluated for sanitation
     - total_allow_listed: number of search terms automatically deemed sanitary/saveable by appearing in an allow list
     - total_rejected: number of search terms deemed at risk of containing personally identifiable information

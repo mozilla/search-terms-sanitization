@@ -55,7 +55,9 @@ async def run_sanitation(args):
             unsanitized_unallowlisted_terms = raw_page.loc[~raw_page.present_in_allow_list]
 
             pii_in_query_mask, run_data, language_data = await detect_pii(unsanitized_unallowlisted_terms['query'], census_surnames)
-            sanitized_page = unsanitized_unallowlisted_terms.loc[~numpy.array(pii_in_query_mask)] # ~ reverses the mask so we get the queries WITHOUT PII in them
+            # ~ reverses the mask so we get the queries WITHOUT PII in them
+            sanitized_page = unsanitized_unallowlisted_terms.loc[~numpy.array(pii_in_query_mask)] 
+            
             total_allow_listed += allow_listed_terms_page.shape[0]
             total_cleared_in_sanitation += sanitized_page.shape[0]
         
@@ -84,13 +86,17 @@ async def run_sanitation(args):
             language_data=summary_language_data,
             implementation_notes=implementation_notes,
             total_terms_inclusive=total_terms,
-            total_blank=total_blank)
+            total_blank=total_blank
+        )
 
     except Exception as e:
-        # TODO: Make this more robust in actual failure cases
-        # Maybe include the reason? Or should the logs be elsewhere for that
-        record_job_metadata(status='FAILURE', started_at=start_time, ended_at=datetime.utcnow(),
-                            destination_table_id=args.job_reporting_destination, failure_reason=str(e))
+        record_job_metadata(
+            status='FAILURE', 
+            started_at=start_time, 
+            ended_at=datetime.utcnow(),
+             destination_table_id=args.job_reporting_destination, 
+            failure_reason=str(e)
+        )
         raise e
     
     data_validation_sample = data_validation_sample.drop(columns=['present_in_allow_list'])
