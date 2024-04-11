@@ -1,5 +1,5 @@
 from google.cloud import bigquery
-from datetime import date
+from datetime import date, datetime, timedelta, timezone
 import spacy
 import spacy_fastlang
 import asyncio
@@ -7,6 +7,8 @@ import re
 import json
 import string
 import os
+
+UTC = timezone.utc
 
 
 async def detect_pii(series, census_surnames):
@@ -147,12 +149,12 @@ WHERE
     -- Trim empty queries
     AND TRIM(search_logs.jsonPayload.fields.query) != ""
     --Specifically get the previous day's data
-    AND timestamp >= DATE_ADD(CURRENT_TIMESTAMP(), INTERVAL -1 DAY)
-    AND DATE(timestamp) < CURRENT_DATE()
+    AND DATE(timestamp) >= @start_date
+    AND DATE(timestamp) < @end_date
 """
 
 
-def stream_search_terms(): 
+def stream_search_terms(start_date: str, end_date: str): 
     """
     Pull the full 2-day dataset of unsanitized search queries stored on BigQuery.
     
@@ -161,7 +163,13 @@ def stream_search_terms():
     Returns: A dataframe of the unsanitized search queries.
     """
     client = bigquery.Client()
-    query_job = client.query(UNSANITIZED_QUERIES_FOR_ANALYSIS_SQL)
+    job_config = bigquery.QueryJobConfig(
+        query_parameters=[
+            bigquery.ScalarQueryParameter("start_date", "STRING", start_date),
+            bigquery.ScalarQueryParameter("end_date", "STRING", end_date),
+       ]
+    )
+    query_job = client.query(UNSANITIZED_QUERIES_FOR_ANALYSIS_SQL, job_config=job_config)
     df_generator = query_job.result().to_dataframe_iterable()
     # df_generator = query_job.result(page_size=75000).to_dataframe_iterable()
     return df_generator
@@ -175,12 +183,12 @@ FROM `suggest-searches-prod-a30f.logs.stdout` AS search_logs
 WHERE 
     jsonPayload.type = "web.suggest.request"
     --Specifically get the previous day's data
-    AND timestamp >= DATE_ADD(CURRENT_TIMESTAMP(), INTERVAL -1 DAY)
-    AND DATE(timestamp) < CURRENT_DATE()
+    AND DATE(timestamp) >= @start_date
+    AND DATE(timestamp) < @end_date
 """
 
 
-def get_initial_term_stats():
+def get_initial_term_stats(start_date: str, end_date: str):
     """
     Query the search logs table to get a total term count and total blank query count.
 
@@ -189,8 +197,38 @@ def get_initial_term_stats():
     Returns A dataframe
     """
     client = bigquery.Client()
-    query_job = client.query_and_wait(UNSANITIZED_QUERY_STATS)
+    job_config = bigquery.QueryJobConfig(
+        query_parameters=[
+            bigquery.ScalarQueryParameter("start_date", "STRING", start_date),
+            bigquery.ScalarQueryParameter("end_date", "STRING", end_date),
+       ]
+    )
+    query_job = client.query_and_wait(UNSANITIZED_QUERY_STATS, job_config=job_config)
     return query_job.to_dataframe()
+
+
+def parse_run_date(run_date: str) -> tuple[str, str]:
+    """
+    Parses the run date and returns a tuple of start_date, end_date in canonical date format for bigquery:
+    see https://cloud.google.com/bigquery/docs/reference/standard-sql/data-types#canonical_format_for_date_literals
+    
+    Arguments:
+        - run_date: A string representing the date to be run over.
+
+    Returns:
+        Tuple of date formatted strings. The first element is start date and second is end date.
+    """
+    date_format = "%Y-%m-%d"
+    end_date: date
+    start_date: date
+    if run_date == "latest":
+        end_date = datetime.now(UTC).date()
+        start_date = end_date - timedelta(days=1)
+    else:
+        start_date = datetime.fromisoformat(run_date).date()
+        end_date = start_date + timedelta(days=1)
+
+    return (start_date.strftime(date_format), end_date.strftime(date_format))
 
 
 def export_search_queries_to_bigquery(dataframe, destination_table_id, date):
@@ -208,7 +246,7 @@ def export_search_queries_to_bigquery(dataframe, destination_table_id, date):
     """
     client = bigquery.Client()
     
-    partition = date.strftime("%Y%m%d")
+    partition = datetime.fromisoformat(date).strftime("%Y%m%d")
 
     # For idempotency, we want to overwrite data on daily partitions
     # But the BQ role granted to the sanitizer service account does not include creating tables
