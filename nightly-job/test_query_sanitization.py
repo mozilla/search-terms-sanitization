@@ -2,7 +2,7 @@ import pytest
 from query_sanitization import detect_pii
 import pandas as pd
 
-FAKE_CENSUS_SURNAMES = ["troy", "stuckey", "klukas", "burwei", "zeber", "reid", "dawson"] 
+FAKE_CENSUS_SURNAMES = ["troy", "stuckey", "klukas", "burwei", "zeber", "reid", "dawson", "bozo"] 
 
 @pytest.mark.asyncio
 async def test_detect_pii_replaces_none():
@@ -69,7 +69,8 @@ async def test_detect_pii_marks_common_surnames():
     For now we do not remove them, because they contain a lot of
     words that are USUALLY not used as names, like 'black' or 'brown' or 'white'
     """    
-    _, run_data, _ = await detect_pii(pd.Series(["Will chelsea troy ever stop being a clown"]), FAKE_CENSUS_SURNAMES)
+    _, run_data, _ = await detect_pii(pd.Series(["Will bozo ever stop being a clown"]), FAKE_CENSUS_SURNAMES)
+    print(run_data)
     assert run_data['sum_terms_containing_us_census_surname'] == 1
     
     _, run_data, _ = await detect_pii(pd.Series(["The future of clowns"]), FAKE_CENSUS_SURNAMES)

@@ -29,7 +29,7 @@ This repo's directory structure is minimal for now. We'll add more structure as 
 ## Outputs
 The nightly sanitization job writes data to
 * sanitized search terms: `moz-fx-data-shared-prod.search_terms_derived.merino_log_sanitized_v3`
-* the job metadata table: `moz-fx-data-shared-prod.search_terms_derived.sanitization_job_metadata`
+* the job metadata table: `moz-fx-data-shared-prod.search_terms_derived.sanitization_job_metadata_v2`
 * the job metadata languages table: `moz-fx-data-shared-prod.search_terms.sanitization_job_languages`
 
 # Related artifacts

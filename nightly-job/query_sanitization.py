@@ -1,11 +1,14 @@
 from google.cloud import bigquery
-from datetime import date
+from datetime import date, datetime, timedelta, timezone
 import spacy
 import spacy_fastlang
 import asyncio
 import re
 import json
 import string
+import os
+
+UTC = timezone.utc
 
 
 async def detect_pii(series, census_surnames):
@@ -143,13 +146,15 @@ FROM `suggest-searches-prod-a30f.logs.stdout` AS search_logs
 LEFT JOIN approved_terms on search_logs.jsonPayload.fields.query = approved_terms.query
 WHERE 
     jsonPayload.type = "web.suggest.request"
+    -- Trim empty queries
+    AND TRIM(search_logs.jsonPayload.fields.query) != ""
     --Specifically get the previous day's data
-    AND timestamp >= DATE_ADD(CURRENT_TIMESTAMP(), INTERVAL -1 DAY)
-    AND DATE(timestamp) < CURRENT_DATE()
+    AND DATE(timestamp) >= @start_date
+    AND DATE(timestamp) < @end_date
 """
 
 
-def stream_search_terms(): 
+def stream_search_terms(start_date: str, end_date: str): 
     """
     Pull the full 2-day dataset of unsanitized search queries stored on BigQuery.
     
@@ -158,10 +163,73 @@ def stream_search_terms():
     Returns: A dataframe of the unsanitized search queries.
     """
     client = bigquery.Client()
-    query_job = client.query(UNSANITIZED_QUERIES_FOR_ANALYSIS_SQL)
+    job_config = bigquery.QueryJobConfig(
+        query_parameters=[
+            bigquery.ScalarQueryParameter("start_date", "STRING", start_date),
+            bigquery.ScalarQueryParameter("end_date", "STRING", end_date),
+       ]
+    )
+    query_job = client.query(UNSANITIZED_QUERIES_FOR_ANALYSIS_SQL, job_config=job_config)
     df_generator = query_job.result().to_dataframe_iterable()
     # df_generator = query_job.result(page_size=75000).to_dataframe_iterable()
     return df_generator
+
+
+UNSANITIZED_QUERY_STATS = """
+SELECT
+    COUNT(DISTINCT search_logs.jsonPayload.fields.rid) AS total_term_count,
+    COUNTIF(TRIM(search_logs.jsonPayload.fields.query) = "") AS total_blank_count,
+FROM `suggest-searches-prod-a30f.logs.stdout` AS search_logs
+WHERE 
+    jsonPayload.type = "web.suggest.request"
+    --Specifically get the previous day's data
+    AND DATE(timestamp) >= @start_date
+    AND DATE(timestamp) < @end_date
+"""
+
+
+def get_initial_term_stats(start_date: str, end_date: str):
+    """
+    Query the search logs table to get a total term count and total blank query count.
+
+    Arguments: None
+
+    Returns A dataframe
+    """
+    client = bigquery.Client()
+    job_config = bigquery.QueryJobConfig(
+        query_parameters=[
+            bigquery.ScalarQueryParameter("start_date", "STRING", start_date),
+            bigquery.ScalarQueryParameter("end_date", "STRING", end_date),
+       ]
+    )
+    query_job = client.query_and_wait(UNSANITIZED_QUERY_STATS, job_config=job_config)
+    return query_job.to_dataframe()
+
+
+def parse_run_date(run_date: str) -> tuple[str, str]:
+    """
+    Parses the run date and returns a tuple of start_date, end_date in canonical date format for bigquery:
+    see https://cloud.google.com/bigquery/docs/reference/standard-sql/data-types#canonical_format_for_date_literals
+    
+    Arguments:
+        - run_date: A string representing the date to be run over.
+
+    Returns:
+        Tuple of date formatted strings. The first element is start date and second is end date.
+    """
+    date_format = "%Y-%m-%d"
+    end_date: date
+    start_date: date
+    if run_date == "latest":
+        end_date = datetime.now(UTC).date()
+        start_date = end_date - timedelta(days=1)
+    else:
+        start_date = datetime.fromisoformat(run_date).date()
+        end_date = start_date + timedelta(days=1)
+
+    return (start_date.strftime(date_format), end_date.strftime(date_format))
+
 
 def export_search_queries_to_bigquery(dataframe, destination_table_id, date):
     """
@@ -178,7 +246,7 @@ def export_search_queries_to_bigquery(dataframe, destination_table_id, date):
     """
     client = bigquery.Client()
     
-    partition = date.strftime("%Y%m%d")
+    partition = datetime.fromisoformat(date).strftime("%Y%m%d")
 
     # For idempotency, we want to overwrite data on daily partitions
     # But the BQ role granted to the sanitizer service account does not include creating tables
@@ -208,7 +276,7 @@ def export_search_queries_to_bigquery(dataframe, destination_table_id, date):
     job = client.insert_rows_from_dataframe(
         table=destination_table, dataframe=dataframe
     )
-    print(job)  # Wait for the job to complete.
+    print("SANITIZED INSERT JOB", job)  # Wait for the job to complete.
     
 def export_sample_to_bigquery(dataframe, sample_table_id, date):
     """
@@ -230,7 +298,7 @@ def export_sample_to_bigquery(dataframe, sample_table_id, date):
     """
     client = bigquery.Client()
     
-    partition = date.strftime("%Y%m%d")
+    partition = datetime.fromisoformat(date).strftime("%Y%m%d")
 
     # For idempotency, we want to overwrite data on daily partitions
     # But the BQ role granted to the sanitizer service account does not include creating tables
@@ -263,7 +331,7 @@ def export_sample_to_bigquery(dataframe, sample_table_id, date):
     print(job)  # Wait for the job to complete.
 
 
-def record_job_metadata(status, started_at, ended_at, destination_table, total_run=0, total_allow_listed=0, total_rejected=0, run_data=None, language_data=None, failure_reason=None, implementation_notes=None):
+def record_job_metadata(status, started_at, ended_at, destination_table_id, total_run=0, total_allow_listed=0, total_rejected=0, run_data=None, language_data=None, failure_reason=None, implementation_notes=None, total_terms_inclusive=0, total_blank=0):
     """
     Record metadata on a sanitation job run. There are two types of data:
     
@@ -276,7 +344,7 @@ def record_job_metadata(status, started_at, ended_at, destination_table, total_r
     - status: How the job finished
     - started_at: When the job began
     - ended_at: When the job ended
-    - destination_table: where to log the job info
+    - destination_table_id: where to log the job info
     - total_run: number of search terms evaluated for sanitation
     - total_allow_listed: number of search terms automatically deemed sanitary/saveable by appearing in an allow list
     - total_rejected: number of search terms deemed at risk of containing personally identifiable information
@@ -295,10 +363,12 @@ def record_job_metadata(status, started_at, ended_at, destination_table, total_r
 
     rows_to_insert = [
         {
-         u"status": status, 
+         u"status": status,
+         u"total_search_terms": int(total_terms_inclusive),
          u"total_search_terms_analyzed": total_run, 
          u"total_search_terms_appearing_in_allow_list": total_allow_listed, 
          u"total_search_terms_removed_by_sanitization_job": total_rejected, 
+         u"contained_blank": int(total_blank),
          u"contained_numbers": run_data.get('num_terms_containing_numeral', 0),
          u"contained_at": run_data.get('num_terms_containing_at', 0),
          u"contained_name": run_data.get('num_terms_name_detected', 0),
@@ -313,7 +383,7 @@ def record_job_metadata(status, started_at, ended_at, destination_table, total_r
          u"implementation_notes": implementation_notes
         },
     ]
-    errors = client.insert_rows_json(destination_table, rows_to_insert)
+    errors = client.insert_rows_json(destination_table_id, rows_to_insert)
     if errors == []:
         print("New row representing job run successfully added.")
     else:
