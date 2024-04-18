@@ -4,6 +4,7 @@ google-cloud-bigquery==3.20.1
 spacy==3.7.4
 spacy-fastlang==2.1.0
 db-dtypes==1.2.0
+dockerflow==2024.4.1
 
 pytest==8.1.1
 pytest-asyncio==0.23.6

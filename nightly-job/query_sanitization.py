@@ -1,14 +1,18 @@
+from typing import Sequence
 from google.cloud import bigquery
+from google.cloud.bigquery import table
 from datetime import date, datetime, timedelta, timezone
+from pandas import DataFrame
 import spacy
 import spacy_fastlang
 import asyncio
 import re
 import json
 import string
-import os
+import logging
 
 UTC = timezone.utc
+logger = logging.getLogger('sanitation_job')
 
 
 async def detect_pii(series, census_surnames):
@@ -154,7 +158,7 @@ WHERE
 """
 
 
-def stream_search_terms(start_date: str, end_date: str): 
+def stream_search_terms(start_date: str, end_date: str) -> table.RowIterator: 
     """
     Pull the full 2-day dataset of unsanitized search queries stored on BigQuery.
     
@@ -170,9 +174,7 @@ def stream_search_terms(start_date: str, end_date: str):
        ]
     )
     query_job = client.query(UNSANITIZED_QUERIES_FOR_ANALYSIS_SQL, job_config=job_config)
-    df_generator = query_job.result().to_dataframe_iterable()
-    # df_generator = query_job.result(page_size=75000).to_dataframe_iterable()
-    return df_generator
+    return query_job.result()
 
 
 UNSANITIZED_QUERY_STATS = """
@@ -231,7 +233,7 @@ def parse_run_date(run_date: str) -> tuple[str, str]:
     return (start_date.strftime(date_format), end_date.strftime(date_format))
 
 
-def export_search_queries_to_bigquery(dataframe, destination_table_id, date):
+def export_search_queries_to_bigquery(dataframe: DataFrame, destination_table_id: str, date: str, delete_partition: bool):
     """
     Append more queries to the BigQuery table where we are keeping sanitized search queries.
     
@@ -240,21 +242,30 @@ def export_search_queries_to_bigquery(dataframe, destination_table_id, date):
         Dataframe should include a timestamp field of the timestamp type, plus all fields listed in the schema variable in this function's implementation.
     - destination_table_id: the fully qualified name of the table for the data to be exported into.
     - date: The date for which these queries are being inserted. IMPORTANT: this function will overwrite EVERYTHING in the destination table at that date partition with the data in the dataframe passed in.
+    - delete_partition: Boolean to determine if we should delete the destination partition of the job.
     
     Returns: Nothing.
     It does print a result value as a cursory logging mechanism. That result object can be parsed and logged to wherever we like.
     """
+
+    logger.info("Inserting sanitized terms into bigquery", extra={
+        "table": destination_table_id,
+        "row_count": dataframe.shape[0],
+    })
     client = bigquery.Client()
     
-    partition = datetime.fromisoformat(date).strftime("%Y%m%d")
 
     # For idempotency, we want to overwrite data on daily partitions
     # But the BQ role granted to the sanitizer service account does not include creating tables
     # Which WRITE_TRUNCATE to a partition requires, so the hack is to
     # Delete existing data from today before insertion of data from today.
+    # We only delete the partition when specified through a parameter
     
-    deletion_target = f'{destination_table_id}${partition}'
-    client.delete_table(deletion_target, not_found_ok=True)
+    if delete_partition:
+        partition = datetime.fromisoformat(date).strftime("%Y%m%d")
+        deletion_target = f'{destination_table_id}${partition}'
+        logger.info("Deleting sanitized term partition", extra={"table_partition": deletion_target})
+        client.delete_table(deletion_target, not_found_ok=True)
     
     # Specify a (partial) schema. All columns are always written to the
     # table. The schema is used to assist in data type definitions.
@@ -273,10 +284,19 @@ def export_search_queries_to_bigquery(dataframe, destination_table_id, date):
         ]
 
     destination_table = bigquery.Table(destination_table_id, schema=schema)
-    job = client.insert_rows_from_dataframe(
+    insert_results = client.insert_rows_from_dataframe(
         table=destination_table, dataframe=dataframe
     )
-    print("SANITIZED INSERT JOB", job)  # Wait for the job to complete.
+    logger.info("Completed insert of sanitized terms", extra={
+        "table": destination_table_id,
+        "errors": get_result_errors(insert_results),
+    })
+
+def get_result_errors(insert_results: Sequence[Sequence[dict]]) -> list[dict]:
+    errors = []
+    for chunk in insert_results:
+        errors += [row['errors'][0] for row in chunk if 'errors' in row]
+    return errors
     
 def export_sample_to_bigquery(dataframe, sample_table_id, date):
     """
@@ -325,10 +345,13 @@ def export_sample_to_bigquery(dataframe, sample_table_id, date):
         ]
 
     destination_table = bigquery.Table(sample_table_id, schema=schema)
-    job = client.insert_rows_from_dataframe(
+    insert_results = client.insert_rows_from_dataframe(
         table=destination_table, dataframe=dataframe
     )
-    print(job)  # Wait for the job to complete.
+    logger.info("Completed insert of unsanitized terms sample", extra={
+        "table": sample_table_id,
+        "errors": get_result_errors(insert_results),
+    })
 
 
 def record_job_metadata(status, started_at, ended_at, destination_table_id, total_run=0, total_allow_listed=0, total_rejected=0, run_data=None, language_data=None, failure_reason=None, implementation_notes=None, total_terms_inclusive=0, total_blank=0):
@@ -385,8 +408,8 @@ def record_job_metadata(status, started_at, ended_at, destination_table_id, tota
     ]
     errors = client.insert_rows_json(destination_table_id, rows_to_insert)
     if errors == []:
-        print("New row representing job run successfully added.")
+        logger.info("New row representing job run successfully added.")
     else:
-        print("Encountered errors while inserting row: {}".format(errors))
+        logger.error("Encountered errors while inserting row", extra={"errors": errors})
 
 
