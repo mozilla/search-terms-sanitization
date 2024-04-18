@@ -1,7 +1,9 @@
 from datetime import datetime, timezone
 import argparse
+import logging
 
 from query_sanitization import get_initial_term_stats, parse_run_date, stream_search_terms, detect_pii, export_search_queries_to_bigquery, export_sample_to_bigquery, record_job_metadata
+import logging_config
 import numpy
 import pandas as pd
 import asyncio
@@ -11,6 +13,8 @@ import functools
 import operator
 
 UTC = timezone.utc
+logging_config.configure_logging()
+logger = logging.getLogger("sanitation_job")
 
 pd.set_option("mode.copy_on_write", True)
 
@@ -39,7 +43,10 @@ async def run_sanitation(args):
     summary_run_data = {}
     summary_language_data = {}
     start_date, end_date = parse_run_date(args.run_date)
-    print("Running Sanitation Job for the following dates: {} - {}".format(start_date, end_date))
+    logger.info("Starting sanitation job", extra={
+        "start_date": start_date,
+        "end_date": end_date,
+    })
     
     data_validation_sample = pd.DataFrame()
 
@@ -48,8 +55,16 @@ async def run_sanitation(args):
         total_terms = initial_stats.loc[0].total_term_count
         total_blank = initial_stats.loc[0].total_blank_count
 
-        unsanitized_search_term_stream = stream_search_terms(start_date=start_date, end_date=end_date) # load unsanitized search terms
-        for raw_page in unsanitized_search_term_stream:
+        result_row_iter = stream_search_terms(start_date=start_date, end_date=end_date) # load unsanitized search terms
+        logger.info("Fetched rows from bigquery", extra={
+            "total_rows": result_row_iter.total_rows,
+        })
+        unsanitized_search_term_stream = result_row_iter.to_dataframe_iterable()
+        for idx, raw_page in enumerate(unsanitized_search_term_stream):
+            logger.info("Sanitizing dataframe of search terms", extra={
+                "page_num": idx,
+                "page_size": raw_page.shape[0],
+            })
             total_run += raw_page.shape[0]
         
             one_percent_sample = raw_page.sample(frac = 0.01)
@@ -72,8 +87,15 @@ async def run_sanitation(args):
                 
             all_terms_to_keep = pd.concat([allow_listed_terms_page, sanitized_page])
             all_terms_to_keep = all_terms_to_keep.drop(columns=['present_in_allow_list'])
+
+            delete_destination_partition = idx == 0
         
-            export_search_queries_to_bigquery(dataframe=all_terms_to_keep, destination_table_id=args.sanitized_term_destination, date=start_date)
+            export_search_queries_to_bigquery(
+                dataframe=all_terms_to_keep,
+                destination_table_id=args.sanitized_term_destination,
+                date=start_date,
+                delete_partition=delete_destination_partition
+            )
     
         end_time = datetime.now(UTC)
         
@@ -105,5 +127,6 @@ async def run_sanitation(args):
     
     data_validation_sample = data_validation_sample.drop(columns=['present_in_allow_list'])
     export_sample_to_bigquery(dataframe=data_validation_sample, sample_table_id=args.unsanitized_term_sample_destination, date=start_date)
+    logger.info("Sanitation job complete!")
 
 asyncio.run(run_sanitation(args=args))
