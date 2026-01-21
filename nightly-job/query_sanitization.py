@@ -17,19 +17,22 @@ logger = logging.getLogger('sanitation_job')
 
 async def detect_pii(series, census_surnames):
     """
-    Arguments: 
+    Arguments:
     - series: A dataframe series of search queries as strings
     - census_surnames: a list of names to check for in the queries: job metrics will indicate how many times a term included one of these names
-    
-    Returns: 
+
+    Returns:
     A sequence of the same length as the series containing booleans representing whether each query should be removed from the dataset for sanitation. Can be used as a mask over the orgiginal series in the dataframe
-    
+
     Why not use pandas `apply` and a function that takes in one query at a time? Because spaCy can do the nlp processing on a batch of queries much faster if passed all the queries at once, rather than individually.
     """
+    checkpoint_start = datetime.now(timezone.utc)
+    last_checkpoint = checkpoint_start
+
     pii_risk = [0] * len(series) # We prepopulate the sequence so we can mutate it at indices in separate tasks
     run_data = {
-        'num_terms_containing_at': 0, 
-        'num_terms_containing_numeral': 0, 
+        'num_terms_containing_at': 0,
+        'num_terms_containing_numeral': 0,
         'num_terms_name_detected': 0,
         'sum_chars_all_terms' : 0,
         'sum_uppercase_chars_all_terms' : 0,
@@ -37,15 +40,36 @@ async def detect_pii(series, census_surnames):
         'sum_terms_containing_us_census_surname' : 0
     }
     language_data = {}
-    
+
     # spaCy chokes when asked to evaluate 'None' instead of a text string
     series.fillna("FX_RECEIVED_EMPTY_QUERY", inplace=True)
     texts = list(series)
     tasks = []
-    
-    nlp = spacy.load("en_core_web_lg") 
+
+    logger.info("checkpoint_pii_1: Starting spaCy model load", extra={
+        "checkpoint_delta_seconds": 0,
+    })
+
+    nlp = spacy.load("en_core_web_lg")
     nlp.add_pipe("language_detector")
+
+    now = datetime.now(timezone.utc)
+    logger.info("checkpoint_pii_2: spaCy model loaded", extra={
+        "checkpoint_delta_seconds": (now - last_checkpoint).total_seconds(),
+    })
+    last_checkpoint = now
+
+    logger.info("checkpoint_pii_3: Starting NLP processing", extra={
+        "checkpoint_delta_seconds": 0,
+    })
+
     docs = list(nlp.pipe(texts))
+
+    now = datetime.now(timezone.utc)
+    logger.info("checkpoint_pii_4: NLP processing completed", extra={
+        "checkpoint_delta_seconds": (now - last_checkpoint).total_seconds(),
+    })
+    last_checkpoint = now
     
     query_data = list(zip(texts, docs))
                 
