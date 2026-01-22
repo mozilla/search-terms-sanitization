@@ -3,8 +3,6 @@ from google.cloud import bigquery
 from google.cloud.bigquery import table
 from datetime import date, datetime, timedelta, timezone
 from pandas import DataFrame
-import spacy
-import spacy_fastlang
 import asyncio
 import re
 import json
@@ -15,11 +13,12 @@ UTC = timezone.utc
 logger = logging.getLogger('sanitation_job')
 
 
-async def detect_pii(series, census_surnames):
+async def detect_pii(series, census_surnames, nlp):
     """
     Arguments:
     - series: A dataframe series of search queries as strings
-    - census_surnames: a list of names to check for in the queries: job metrics will indicate how many times a term included one of these names
+    - census_surnames: a set of names to check for in the queries: job metrics will indicate how many times a term included one of these names
+    - nlp: A pre-loaded spaCy model with language_detector pipe already added
 
     Returns:
     A sequence of the same length as the series containing booleans representing whether each query should be removed from the dataset for sanitation. Can be used as a mask over the orgiginal series in the dataframe
@@ -46,27 +45,14 @@ async def detect_pii(series, census_surnames):
     texts = list(series)
     tasks = []
 
-    logger.info("checkpoint_pii_1: Starting spaCy model load", extra={
-        "checkpoint_delta_seconds": 0,
-    })
-
-    nlp = spacy.load("en_core_web_lg")
-    nlp.add_pipe("language_detector")
-
-    now = datetime.now(timezone.utc)
-    logger.info("checkpoint_pii_2: spaCy model loaded", extra={
-        "checkpoint_delta_seconds": (now - last_checkpoint).total_seconds(),
-    })
-    last_checkpoint = now
-
-    logger.info("checkpoint_pii_3: Starting NLP processing", extra={
+    logger.info("checkpoint_pii_1: Starting NLP processing", extra={
         "checkpoint_delta_seconds": 0,
     })
 
     docs = list(nlp.pipe(texts))
 
     now = datetime.now(timezone.utc)
-    logger.info("checkpoint_pii_4: NLP processing completed", extra={
+    logger.info("checkpoint_pii_2: NLP processing completed", extra={
         "checkpoint_delta_seconds": (now - last_checkpoint).total_seconds(),
     })
     last_checkpoint = now
@@ -92,7 +78,7 @@ async def mutate_risk(pii_risk, run_data, language_data, idx, query_info, census
     - language_data: a Python dictionary counting the language categorizations for the terms run
     - idx: the index of the search query being sanitized
     - query_info: A list of tuples containing [0] the text and [1] spaCy NLP analysis of the query being analyzed
-    - census_surnames: A preoppulated list of names to check for from the U.S. Census
+    - census_surnames: A prepopulated set of names to check for from the U.S. Census
     
     Returns: nothing
     
