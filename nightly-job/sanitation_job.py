@@ -7,6 +7,7 @@ import logging_config
 import numpy
 import pandas as pd
 import asyncio
+import spacy
 
 import collections
 import functools
@@ -27,7 +28,7 @@ parser.add_argument("--unsanitized_term_sample_destination", help="Destination t
 args = parser.parse_args()
 
 df = pd.read_csv('Names_2010Census.csv')
-census_surnames = [str(name).lower() for name in df.name]
+census_surnames = set(str(name).lower() for name in df.name)
 
 async def run_sanitation(args):
     start_time = datetime.now(UTC)
@@ -52,7 +53,7 @@ async def run_sanitation(args):
         "checkpoint_delta_seconds": 0,
     })
 
-    data_validation_sample = pd.DataFrame()
+    data_validation_sample_list = []
 
     try:
         initial_stats = get_initial_term_stats(start_date=start_date, end_date=end_date)
@@ -81,6 +82,14 @@ async def run_sanitation(args):
         })
         last_checkpoint = now
 
+        nlp = spacy.load("en_core_web_lg")
+        nlp.add_pipe("language_detector")
+        now = datetime.now(UTC)
+        logger.info("checkpoint_3a: spaCy model loaded", extra={
+            "checkpoint_delta_seconds": (now - last_checkpoint).total_seconds(),
+        })
+        last_checkpoint = now
+
         for idx, raw_page in enumerate(unsanitized_search_term_stream):
             page_start = datetime.now(UTC)
             logger.info("Sanitizing dataframe of search terms", extra={
@@ -95,7 +104,7 @@ async def run_sanitation(args):
             total_run += raw_page.shape[0]
 
             one_percent_sample = raw_page.sample(frac = 0.01)
-            data_validation_sample = pd.concat([data_validation_sample, one_percent_sample])
+            data_validation_sample_list.append(one_percent_sample)
 
             allow_listed_terms_page = raw_page.loc[raw_page.present_in_allow_list]
             unsanitized_unallowlisted_terms = raw_page.loc[~raw_page.present_in_allow_list]
@@ -106,7 +115,7 @@ async def run_sanitation(args):
             })
             last_checkpoint = now
 
-            pii_in_query_mask, run_data, language_data = await detect_pii(unsanitized_unallowlisted_terms['query'], census_surnames)
+            pii_in_query_mask, run_data, language_data = await detect_pii(unsanitized_unallowlisted_terms['query'], census_surnames, nlp)
 
             now = datetime.now(UTC)
             logger.info("checkpoint_6: PII detection completed", extra={
@@ -189,6 +198,7 @@ async def run_sanitation(args):
         )
         raise e
 
+    data_validation_sample = pd.concat(data_validation_sample_list, ignore_index=True)
     data_validation_sample = data_validation_sample.drop(columns=['present_in_allow_list'])
 
     now = datetime.now(UTC)
