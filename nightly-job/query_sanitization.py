@@ -45,22 +45,50 @@ async def detect_pii(series, census_surnames, nlp):
     texts = list(series)
     tasks = []
 
-    logger.info("checkpoint_pii_1: Starting NLP processing", extra={
+    logger.info("checkpoint_pii_1: Starting filter for numbers and @", extra={
         "checkpoint_delta_seconds": 0,
     })
 
-    docs = list(nlp.pipe(texts))
+    indices_needing_nlp = []
+    texts_needing_nlp = []
+
+    for idx, query in enumerate(texts):
+        query_str = str(query)
+        if any(character in query_str for character in ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"]):
+            pii_risk[idx] = True
+            run_data['num_terms_containing_numeral'] += 1
+            continue
+        if "@" in query_str:
+            pii_risk[idx] = True
+            run_data['num_terms_containing_at'] += 1
+            continue
+        indices_needing_nlp.append(idx)
+        texts_needing_nlp.append(query_str)
+
+    now = datetime.now(timezone.utc)
+    logger.info("checkpoint_pii_1a: Quick filter completed", extra={
+        "checkpoint_delta_seconds": (now - last_checkpoint).total_seconds(),
+        "queries_needing_nlp": len(texts_needing_nlp),
+        "queries_rejected_early": len(texts) - len(texts_needing_nlp),
+    })
+    last_checkpoint = now
+
+    logger.info("checkpoint_pii_1b: Starting NLP processing", extra={
+        "checkpoint_delta_seconds": 0,
+    })
+
+    docs = list(nlp.pipe(texts_needing_nlp))
 
     now = datetime.now(timezone.utc)
     logger.info("checkpoint_pii_2: NLP processing completed", extra={
         "checkpoint_delta_seconds": (now - last_checkpoint).total_seconds(),
     })
     last_checkpoint = now
-    
-    query_data = list(zip(texts, docs))
-                
-    for idx, search_query in enumerate(query_data):
-        task = asyncio.ensure_future(mutate_risk(pii_risk=pii_risk, run_data=run_data, language_data=language_data, idx=idx, query_info=search_query, census_surnames=census_surnames))
+
+    query_data = list(zip(indices_needing_nlp, texts_needing_nlp, docs))
+
+    for idx, query_text, doc in query_data:
+        task = asyncio.ensure_future(mutate_risk(pii_risk=pii_risk, run_data=run_data, language_data=language_data, idx=idx, query_info=(query_text, doc), census_surnames=census_surnames))
         tasks.append(task)
     await asyncio.gather(*tasks, return_exceptions=True)
     return pii_risk, run_data, language_data
@@ -89,17 +117,8 @@ async def mutate_risk(pii_risk, run_data, language_data, idx, query_info, census
     analyze changes in our constituents' search terms, which helps us monitor the effectiveness of our sanitation strategy.
     """
     query, doc = str(query_info[0]), query_info[1]
-    
-    # Sanitize Individual Queries
-    if any(character in query for character in ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"]):
-        pii_risk[idx] = True
-        run_data['num_terms_containing_numeral'] +=1
-        return
-    if "@" in query:
-        pii_risk[idx] = True
-        run_data['num_terms_containing_at'] +=1
-        return
-    elif any([ent.text for ent in doc.ents if ent.label_ == 'PERSON']):
+
+    if any([ent.text for ent in doc.ents if ent.label_ == 'PERSON']):
         pii_risk[idx] = True
         run_data['num_terms_name_detected'] += 1
         return
