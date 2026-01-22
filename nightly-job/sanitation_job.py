@@ -8,6 +8,7 @@ import numpy
 import pandas as pd
 import asyncio
 import spacy
+import spacy_fastlang
 
 import collections
 import functools
