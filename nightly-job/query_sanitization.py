@@ -3,7 +3,6 @@ from google.cloud import bigquery
 from google.cloud.bigquery import table
 from datetime import date, datetime, timedelta, timezone
 from pandas import DataFrame
-import asyncio
 import re
 import json
 import string
@@ -13,7 +12,7 @@ UTC = timezone.utc
 logger = logging.getLogger('sanitation_job')
 
 
-async def detect_pii(series, census_surnames, nlp):
+def detect_pii(series, census_surnames, nlp):
     """
     Arguments:
     - series: A dataframe series of search queries as strings
@@ -42,11 +41,31 @@ async def detect_pii(series, census_surnames, nlp):
 
     # spaCy chokes when asked to evaluate 'None' instead of a text string
     series.fillna("FX_RECEIVED_EMPTY_QUERY", inplace=True)
-    texts = list(series)
-    tasks = []
+
+    # Early filtering to avoid expensive NLP scanning on those filtered inputs.
+    # Use Panda vectorized string utilities for better performance.
+    has_digit = series.str.contains(r'\d', regex=True, na=False)
+    has_at = series.str.contains('@', regex=False, na=False)
+    early_reject = has_digit | has_at
+
+    # Update counts for early-rejected queries
+    run_data['num_terms_containing_numeral'] = int(has_digit.sum())
+    run_data['num_terms_containing_at'] = int(has_at.sum())
+
+    # Mark early rejections and build filtered list for NLP
+    texts = []
+    nlp_indices = []  # Maps filtered index -> original index in series
+    for i in range(len(series)):
+        if early_reject.iloc[i]:
+            pii_risk[i] = True
+        else:
+            texts.append(series.iloc[i])
+            nlp_indices.append(i)
 
     logger.info("checkpoint_pii_1: Starting NLP processing", extra={
         "checkpoint_delta_seconds": 0,
+        "queries_after_early_filtering": len(texts),
+        "queries_filtered_early": int(early_reject.sum()),
     })
 
     docs = list(nlp.pipe(texts))
@@ -56,22 +75,23 @@ async def detect_pii(series, census_surnames, nlp):
         "checkpoint_delta_seconds": (now - last_checkpoint).total_seconds(),
     })
     last_checkpoint = now
-    
+
     query_data = list(zip(texts, docs))
-                
-    for idx, search_query in enumerate(query_data):
-        task = asyncio.ensure_future(mutate_risk(pii_risk=pii_risk, run_data=run_data, language_data=language_data, idx=idx, query_info=search_query, census_surnames=census_surnames))
-        tasks.append(task)
-    await asyncio.gather(*tasks, return_exceptions=True)
+
+    for filtered_idx, search_query in enumerate(query_data):
+        original_idx = nlp_indices[filtered_idx]
+        mutate_risk(pii_risk=pii_risk, run_data=run_data, language_data=language_data, idx=original_idx, query_info=search_query, census_surnames=census_surnames)
     return pii_risk, run_data, language_data
 
 
-async def mutate_risk(pii_risk, run_data, language_data, idx, query_info, census_surnames):
+def mutate_risk(pii_risk, run_data, language_data, idx, query_info, census_surnames):
     """
-    Sets mask value at index True if search query contains "@", a number, or 
-    a name as determined by spaCy named entity recognition.
-    Otherwise, sets mask value at index to False.
-    
+    Sets mask value at index True if search query contains a name as determined by
+    spaCy named entity recognition. Otherwise, sets mask value at index to False.
+
+    Note: Digit and @ symbol checks are now performed in early filtering (detect_pii)
+    before NLP processing to avoid expensive spaCy processing on queries that will be rejected.
+
     Arguments:
     - pii_risk: a sequence of values representing all the queries
     - run_data: a Python dictionary with a variety of aggregate metrics in it about what was in the terms run
@@ -79,38 +99,30 @@ async def mutate_risk(pii_risk, run_data, language_data, idx, query_info, census
     - idx: the index of the search query being sanitized
     - query_info: A list of tuples containing [0] the text and [1] spaCy NLP analysis of the query being analyzed
     - census_surnames: A prepopulated set of names to check for from the U.S. Census
-    
+
     Returns: nothing
-    
-    MUTATES: 
-    - The mask passed in as the first argument, at the index passed in the second argument, to the 
+
+    MUTATES:
+    - The mask passed in as the first argument, at the index passed in the second argument, to the
     analysis of whether the third argument contains pii (True or False).
-    - A dictionary containing aggregate metrics for this entire sanitation job. We use these to 
+    - A dictionary containing aggregate metrics for this entire sanitation job. We use these to
     analyze changes in our constituents' search terms, which helps us monitor the effectiveness of our sanitation strategy.
     """
     query, doc = str(query_info[0]), query_info[1]
-    
-    # Sanitize Individual Queries
-    if any(character in query for character in ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"]):
-        pii_risk[idx] = True
-        run_data['num_terms_containing_numeral'] +=1
-        return
-    if "@" in query:
-        pii_risk[idx] = True
-        run_data['num_terms_containing_at'] +=1
-        return
-    elif any([ent.text for ent in doc.ents if ent.label_ == 'PERSON']):
+
+    # Sanitize individual queries - check for `PERSON` entities
+    if any([ent.text for ent in doc.ents if ent.label_ == 'PERSON']):
         pii_risk[idx] = True
         run_data['num_terms_name_detected'] += 1
         return
     else:
         pii_risk[idx] = False
-        
+
     # Aggregate character, word, and uppercase metrics
-    run_data['sum_chars_all_terms'] += len(query)    
-    run_data['sum_words_all_terms'] += len(query.split())  
+    run_data['sum_chars_all_terms'] += len(query)
+    run_data['sum_words_all_terms'] += len(query.split())
     run_data['sum_uppercase_chars_all_terms'] += len(re.findall(r'[A-Z]', query))
-    
+
     # Language Detection
     # Chelsea Troy's visual analysis of 250 terms on May 31, 2022 determined that
     # 1. It takes about 6 characters for a human (well, for her at least) to be reasonably confident what language the term is in
@@ -120,15 +132,13 @@ async def mutate_risk(pii_risk, run_data, language_data, idx, query_info, census
             language_data[doc._.language] += 1
         else:
             language_data[doc._.language] = 1
-    
-    # Detect Surnames from the U.S. Census (2010) 
-    query_words = [unprocessed_word.lower().strip().translate(str.maketrans('', '', string.punctuation)) for unprocessed_word in query.split()]
 
-    for word in query_words:
-        if word in census_surnames:
-            run_data['sum_terms_containing_us_census_surname'] += 1
-            return
-        
+    query_words = [unprocessed_word.lower().strip().translate(str.maketrans('', '', string.punctuation)) for unprocessed_word in query.split()]
+    query_words_set = set(query_words)
+
+    if query_words_set & census_surnames:  # Fast set intersection
+        run_data['sum_terms_containing_us_census_surname'] += 1
+
 
 UNSANITIZED_QUERIES_FOR_ANALYSIS_SQL = """
 WITH approved_terms as (
