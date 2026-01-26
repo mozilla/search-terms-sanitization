@@ -1,14 +1,13 @@
 import pytest
-from query_sanitization import detect_pii
+from query_sanitization import detect_pii, load_nlp_model
 import pandas as pd
-import spacy
 import spacy_fastlang
 
 FAKE_CENSUS_SURNAMES = {"troy", "stuckey", "klukas", "burwei", "zeber", "reid", "dawson", "bozo"}
 
 @pytest.fixture(scope="module")
 def nlp_model():
-    nlp = spacy.load("en_core_web_lg")
+    nlp = load_nlp_model()
     nlp.add_pipe("language_detector")
     return nlp
 

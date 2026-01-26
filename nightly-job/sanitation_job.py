@@ -2,12 +2,11 @@ from datetime import datetime, timezone
 import argparse
 import logging
 
-from query_sanitization import get_initial_term_stats, parse_run_date, stream_search_terms, detect_pii, export_search_queries_to_bigquery, export_sample_to_bigquery, record_job_metadata
+from query_sanitization import get_initial_term_stats, parse_run_date, stream_search_terms, detect_pii, export_search_queries_to_bigquery, export_sample_to_bigquery, record_job_metadata, load_nlp_model
 import logging_config
 import numpy
 import pandas as pd
 import asyncio
-import spacy
 import spacy_fastlang
 
 import collections
@@ -83,7 +82,7 @@ async def run_sanitation(args):
         })
         last_checkpoint = now
 
-        nlp = spacy.load("en_core_web_lg")
+        nlp = load_nlp_model()
         nlp.add_pipe("language_detector")
         now = datetime.now(UTC)
         logger.info("checkpoint_3a: spaCy model loaded", extra={
