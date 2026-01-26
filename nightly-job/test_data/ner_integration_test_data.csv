@@ -1,0 +1,508 @@
+query,language,category,expected_ner_removal
+John Smith dentist near me,en,should_remove,True
+Dr. Michael Johnson reviews,en,should_remove,True
+Jennifer Williams attorney,en,should_remove,True
+Barack Obama biography,en,should_remove,True
+Taylor Swift concert tickets,en,should_remove,True
+Elon Musk net worth,en,should_remove,True
+Bill Gates foundation,en,should_remove,True
+Oprah Winfrey show,en,should_remove,True
+Tom Hanks movies,en,should_remove,True
+Serena Williams tennis,en,should_remove,True
+LeBron James stats,en,should_remove,True
+Mark Zuckerberg Facebook,en,should_remove,True
+Jeff Bezos Amazon,en,should_remove,True
+Steve Jobs Apple,en,should_remove,True
+Warren Buffett investing,en,should_remove,True
+Michael Jordan basketball,en,should_remove,True
+George Washington biography,en,should_remove,True
+Abraham Lincoln quotes,en,should_remove,True
+Albert Einstein theory,en,should_remove,True
+Stephen Hawking books,en,should_remove,True
+Marie Curie research,en,should_remove,True
+Thomas Edison inventions,en,should_remove,True
+Benjamin Franklin quotes,en,should_remove,True
+Leonardo da Vinci art,en,should_remove,True
+William Shakespeare plays,en,should_remove,True
+Martin Luther King speech,en,should_remove,True
+Rosa Parks story,en,should_remove,True
+Neil Armstrong moon,en,should_remove,True
+Amelia Earhart flight,en,should_remove,True
+Eleanor Roosevelt quotes,en,should_remove,True
+John F Kennedy assassination,en,should_remove,True
+Ronald Reagan policies,en,should_remove,True
+Margaret Thatcher biography,en,should_remove,True
+Winston Churchill speeches,en,should_remove,True
+Queen Elizabeth news,en,should_remove,True
+Princess Diana documentary,en,should_remove,True
+Prince William family,en,should_remove,True
+Kate Middleton fashion,en,should_remove,True
+Meghan Markle interview,en,should_remove,True
+David Beckham soccer,en,should_remove,True
+Victoria Beckham style,en,should_remove,True
+Cristiano Ronaldo goals,en,should_remove,True
+Lionel Messi highlights,en,should_remove,True
+Tiger Woods golf,en,should_remove,True
+Roger Federer retirement,en,should_remove,True
+Rafael Nadal clay court,en,should_remove,True
+Michael Phelps swimming,en,should_remove,True
+Usain Bolt sprinting,en,should_remove,True
+Simone Biles gymnastics,en,should_remove,True
+Naomi Osaka tennis,en,should_remove,True
+Beyonce concert,en,should_remove,True
+Jay Z business,en,should_remove,True
+Kanye West fashion,en,should_remove,True
+Kim Kardashian makeup,en,should_remove,True
+Kylie Jenner cosmetics,en,should_remove,True
+Drake new album,en,should_remove,True
+Rihanna Fenty beauty,en,should_remove,True
+Lady Gaga music,en,should_remove,True
+Bruno Mars songs,en,should_remove,True
+Ed Sheeran lyrics,en,should_remove,True
+Adele new single,en,should_remove,True
+Justin Bieber tour,en,should_remove,True
+Selena Gomez instagram,en,should_remove,True
+Ariana Grande perfume,en,should_remove,True
+Dua Lipa album,en,should_remove,True
+Billie Eilish interview,en,should_remove,True
+Harry Styles fashion,en,should_remove,True
+Zendaya movies,en,should_remove,True
+Timothee Chalamet films,en,should_remove,True
+Florence Pugh acting,en,should_remove,True
+Chris Hemsworth workout,en,should_remove,True
+Scarlett Johansson movies,en,should_remove,True
+Robert Downey Jr Iron Man,en,should_remove,True
+Chris Evans Captain America,en,should_remove,True
+Tom Holland Spider Man,en,should_remove,True
+Ryan Reynolds Deadpool,en,should_remove,True
+Dwayne Johnson movies,en,should_remove,True
+Keanu Reeves John Wick,en,should_remove,True
+Brad Pitt films,en,should_remove,True
+Angelina Jolie UN,en,should_remove,True
+George Clooney movies,en,should_remove,True
+Julia Roberts actress,en,should_remove,True
+Meryl Streep awards,en,should_remove,True
+Denzel Washington films,en,should_remove,True
+Samuel L Jackson movies,en,should_remove,True
+Morgan Freeman voice,en,should_remove,True
+Anthony Hopkins silence,en,should_remove,True
+Leonardo DiCaprio environment,en,should_remove,True
+Matt Damon movies,en,should_remove,True
+Ben Affleck batman,en,should_remove,True
+Jennifer Lopez wedding,en,should_remove,True
+Shakira music,en,should_remove,True
+Sofia Vergara show,en,should_remove,True
+Salma Hayek movies,en,should_remove,True
+Penelope Cruz actress,en,should_remove,True
+Javier Bardem films,en,should_remove,True
+Antonio Banderas movies,en,should_remove,True
+Helen Mirren queen,en,should_remove,True
+Judi Dench acting,en,should_remove,True
+Kate Winslet titanic,en,should_remove,True
+Emma Watson harry potter,en,should_remove,True
+Daniel Radcliffe actor,en,should_remove,True
+Rupert Grint films,en,should_remove,True
+Matthew McConaughey movies,en,should_remove,True
+Sandra Bullock actress,en,should_remove,True
+Reese Witherspoon production,en,should_remove,True
+Nicole Kidman series,en,should_remove,True
+Hugh Jackman wolverine,en,should_remove,True
+Margot Robbie barbie,en,should_remove,True
+Cate Blanchett movies,en,should_remove,True
+Emma Stone actress,en,should_remove,True
+Ryan Gosling films,en,should_remove,True
+Jake Gyllenhaal movies,en,should_remove,True
+Anne Hathaway actress,en,should_remove,True
+Natalie Portman star wars,en,should_remove,True
+Keira Knightley films,en,should_remove,True
+Rachel McAdams movies,en,should_remove,True
+Amy Adams actress,en,should_remove,True
+Jessica Chastain films,en,should_remove,True
+Oscar Isaac star wars,en,should_remove,True
+Adam Driver movies,en,should_remove,True
+John Boyega actor,en,should_remove,True
+Daisy Ridley films,en,should_remove,True
+Pedro Pascal mandalorian,en,should_remove,True
+Jason Momoa aquaman,en,should_remove,True
+Gal Gadot wonder woman,en,should_remove,True
+Henry Cavill superman,en,should_remove,True
+Michael B Jordan creed,en,should_remove,True
+Chadwick Boseman tribute,en,should_remove,True
+Lupita Nyongo actress,en,should_remove,True
+black shoes for sale,en,common_word,False
+white wedding dress,en,common_word,False
+green smoothie recipe,en,common_word,False
+brown leather jacket,en,common_word,False
+rose gold engagement ring,en,common_word,False
+ivory tower meaning,en,common_word,False
+silver necklace cheap,en,common_word,False
+golden retriever puppies,en,common_word,False
+ruby red lipstick,en,common_word,False
+pearl earrings online,en,common_word,False
+gray winter coat,en,common_word,False
+olive oil benefits,en,common_word,False
+violet flowers meaning,en,common_word,False
+amber alert system,en,common_word,False
+hazel eyes makeup,en,common_word,False
+coral reef dying,en,common_word,False
+jade plant care,en,common_word,False
+hunter boots sale,en,common_word,False
+archer tv show,en,common_word,False
+mason jar crafts,en,common_word,False
+cooper mini car,en,common_word,False
+baker street london,en,common_word,False
+carpenter ants removal,en,common_word,False
+fisher price toys,en,common_word,False
+potter wheel spinning,en,common_word,False
+miller lite beer,en,common_word,False
+taylor made golf,en,common_word,False
+walker texas ranger,en,common_word,False
+king size bed,en,common_word,False
+bishop chess move,en,common_word,False
+knight in armor,en,common_word,False
+duke university ranking,en,common_word,False
+earl grey tea,en,common_word,False
+prince charming story,en,common_word,False
+chancellor position meaning,en,common_word,False
+foster care adoption,en,common_word,False
+porter beer style,en,common_word,False
+cook county illinois,en,common_word,False
+forrest gump movie,en,common_word,False
+hill climbing hiking,en,common_word,False
+brooks running shoes,en,common_word,False
+field hockey rules,en,common_word,False
+woods camping gear,en,common_word,False
+meadows nature walk,en,common_word,False
+stone fireplace design,en,common_word,False
+clay pottery class,en,common_word,False
+glass blowing art,en,common_word,False
+wood carving tools,en,common_word,False
+snow removal service,en,common_word,False
+frost warning tonight,en,common_word,False
+storm forecast week,en,common_word,False
+cloud computing basics,en,common_word,False
+rain gear hiking,en,common_word,False
+spring cleaning tips,en,common_word,False
+summer vacation ideas,en,common_word,False
+winter coat sale,en,common_word,False
+fall foliage tour,en,common_word,False
+beach vacation package,en,common_word,False
+lake house rental,en,common_word,False
+river rafting trip,en,common_word,False
+ocean view hotel,en,common_word,False
+mountain climbing gear,en,common_word,False
+canyon national park,en,common_word,False
+valley wine tour,en,common_word,False
+marsh land birds,en,common_word,False
+pond fish species,en,common_word,False
+bay area weather,en,common_word,False
+harbor seal watching,en,common_word,False
+shore excursion cruise,en,common_word,False
+coast guard rescue,en,common_word,False
+island vacation tropical,en,common_word,False
+ridge hiking trail,en,common_word,False
+peak climbing guide,en,common_word,False
+grove orange juice,en,common_word,False
+dale carnegie book,en,common_word,False
+glen canyon dam,en,common_word,False
+heath chocolate bar,en,common_word,False
+moor scotland hiking,en,common_word,False
+marsh mallow recipe,en,common_word,False
+fern plant indoor,en,common_word,False
+ivy league schools,en,common_word,False
+holly jolly christmas,en,common_word,False
+laurel wreath meaning,en,common_word,False
+aspen skiing resort,en,common_word,False
+cedar wood planks,en,common_word,False
+maple syrup recipe,en,common_word,False
+oak furniture sale,en,common_word,False
+pine tree christmas,en,common_word,False
+willow tree figurines,en,common_word,False
+birch plywood sheets,en,common_word,False
+cherry blossom festival,en,common_word,False
+plum cake recipe,en,common_word,False
+apple pie homemade,en,common_word,False
+peach cobbler easy,en,common_word,False
+berry smoothie healthy,en,common_word,False
+rice cooker best,en,common_word,False
+bean bag chair,en,common_word,False
+corn maze near me,en,common_word,False
+wheat bread recipe,en,common_word,False
+oat milk brands,en,common_word,False
+barley soup healthy,en,common_word,False
+sage advice meaning,en,common_word,False
+basil plant care,en,common_word,False
+mint chocolate chip,en,common_word,False
+ginger tea benefits,en,common_word,False
+pepper spray legal,en,common_word,False
+curry powder recipe,en,common_word,False
+mustard yellow dress,en,common_word,False
+ketchup brands ranked,en,common_word,False
+mayo clinic appointment,en,common_word,False
+ranch dressing homemade,en,common_word,False
+bass fishing tips,en,common_word,False
+pike fish recipe,en,common_word,False
+salmon run season,en,common_word,False
+trout fishing spots,en,common_word,False
+cod liver oil,en,common_word,False
+crane bird origami,en,common_word,False
+hawk bird watching,en,common_word,False
+eagle scout badge,en,common_word,False
+falcon bird species,en,common_word,False
+sparrow bird house,en,common_word,False
+robin nest camera,en,common_word,False
+finch bird feeder,en,common_word,False
+dove chocolate bar,en,common_word,False
+raven poem analysis,en,common_word,False
+swan lake ballet,en,common_word,False
+fox news channel,en,common_word,False
+wolf documentary nature,en,common_word,False
+bear market investing,en,common_word,False
+deer hunting season,en,common_word,False
+hare vs rabbit,en,common_word,False
+lamb chop recipe,en,common_word,False
+colt firearm review,en,common_word,False
+best pizza recipes,en,no_name,False
+weather forecast today,en,no_name,False
+how to cook pasta,en,no_name,False
+cheap flights to europe,en,no_name,False
+home depot hours,en,no_name,False
+walmart store locator,en,no_name,False
+target weekly ad,en,no_name,False
+amazon prime delivery,en,no_name,False
+netflix new releases,en,no_name,False
+youtube music free,en,no_name,False
+spotify premium cost,en,no_name,False
+instagram reels download,en,no_name,False
+twitter trending topics,en,no_name,False
+facebook marketplace cars,en,no_name,False
+tiktok viral videos,en,no_name,False
+snapchat filters new,en,no_name,False
+reddit best posts,en,no_name,False
+pinterest wedding ideas,en,no_name,False
+linkedin job search,en,no_name,False
+indeed hiring near me,en,no_name,False
+glassdoor reviews company,en,no_name,False
+yelp restaurants nearby,en,no_name,False
+tripadvisor hotel reviews,en,no_name,False
+airbnb vacation rental,en,no_name,False
+vrbo beach house,en,no_name,False
+expedia flight deals,en,no_name,False
+kayak compare flights,en,no_name,False
+booking hotel rooms,en,no_name,False
+uber ride estimate,en,no_name,False
+lyft driver requirements,en,no_name,False
+doordash promo code,en,no_name,False
+grubhub free delivery,en,no_name,False
+instacart same day,en,no_name,False
+shipt membership cost,en,no_name,False
+costco membership benefits,en,no_name,False
+sams club hours,en,no_name,False
+bjs wholesale coupons,en,no_name,False
+aldi store locator,en,no_name,False
+trader joes products,en,no_name,False
+whole foods delivery,en,no_name,False
+kroger digital coupons,en,no_name,False
+safeway weekly specials,en,no_name,False
+publix bogo deals,en,no_name,False
+wegmans meal prep,en,no_name,False
+heb curbside pickup,en,no_name,False
+lowes appliances sale,en,no_name,False
+menards rebate form,en,no_name,False
+ace hardware near me,en,no_name,False
+best buy laptop sale,en,no_name,False
+microcenter gpu stock,en,no_name,False
+newegg deals today,en,no_name,False
+gamestop trade in,en,no_name,False
+playstation store sale,en,no_name,False
+xbox game pass,en,no_name,False
+nintendo switch games,en,no_name,False
+steam summer sale,en,no_name,False
+epic games free,en,no_name,False
+discord server setup,en,no_name,False
+twitch streaming guide,en,no_name,False
+zoom meeting link,en,no_name,False
+skype download free,en,no_name,False
+slack workspace invite,en,no_name,False
+teams meeting schedule,en,no_name,False
+gmail login page,en,no_name,False
+outlook calendar sync,en,no_name,False
+yahoo mail settings,en,no_name,False
+icloud storage full,en,no_name,False
+dropbox file sharing,en,no_name,False
+google drive sync,en,no_name,False
+onedrive backup setup,en,no_name,False
+notion templates free,en,no_name,False
+evernote alternatives,en,no_name,False
+trello board tutorial,en,no_name,False
+asana project management,en,no_name,False
+jira ticket creation,en,no_name,False
+github repository clone,en,no_name,False
+stackoverflow error fix,en,no_name,False
+python tutorial beginner,en,no_name,False
+javascript async await,en,no_name,False
+html css basics,en,no_name,False
+react native tutorial,en,no_name,False
+nodejs express api,en,no_name,False
+docker container basics,en,no_name,False
+kubernetes deployment,en,no_name,False
+aws free tier,en,no_name,False
+azure portal login,en,no_name,False
+gcp console access,en,no_name,False
+terraform tutorial,en,no_name,False
+ansible playbook example,en,no_name,False
+jenkins pipeline setup,en,no_name,False
+git merge conflict,en,no_name,False
+vim commands cheat,en,no_name,False
+bash script tutorial,en,no_name,False
+linux mint install,en,no_name,False
+ubuntu server setup,en,no_name,False
+windows update stuck,en,no_name,False
+macos sonoma features,en,no_name,False
+iphone battery health,en,no_name,False
+android phone reset,en,no_name,False
+samsung galaxy comparison,en,no_name,False
+pixel phone review,en,no_name,False
+macbook air specs,en,no_name,False
+dell laptop deals,en,no_name,False
+lenovo thinkpad review,en,no_name,False
+hp printer setup,en,no_name,False
+canon camera settings,en,no_name,False
+nikon lens comparison,en,no_name,False
+sony headphones review,en,no_name,False
+bose speakers bluetooth,en,no_name,False
+airpods pro tips,en,no_name,False
+fitbit charge features,en,no_name,False
+garmin watch running,en,no_name,False
+roomba vacuum review,en,no_name,False
+dyson vacuum cordless,en,no_name,False
+instant pot recipes,en,no_name,False
+ninja blender smoothie,en,no_name,False
+keurig coffee maker,en,no_name,False
+nespresso machine review,en,no_name,False
+vitamix vs blendtec,en,no_name,False
+kitchenaid mixer attachments,en,no_name,False
+cuisinart food processor,en,no_name,False
+lodge cast iron,en,no_name,False
+staub dutch oven,en,no_name,False
+le creuset sale,en,no_name,False
+ikea furniture assembly,en,no_name,False
+wayfair couch review,en,no_name,False
+etsy handmade gifts,en,no_name,False
+ebay auction tips,en,no_name,False
+craigslist cars for sale,en,no_name,False
+offerup local deals,en,no_name,False
+mercari selling tips,en,no_name,False
+poshmark authentication,en,no_name,False
+depop vintage finds,en,no_name,False
+stockx sneaker prices,en,no_name,False
+goat shoe verification,en,no_name,False
+zappos free shipping,en,no_name,False
+nordstrom anniversary sale,en,no_name,False
+macys coupons today,en,no_name,False
+kohls cash rewards,en,no_name,False
+jcpenney clearance sale,en,no_name,False
+dillards shoe sale,en,no_name,False
+bloomingdales rewards,en,no_name,False
+saks fifth avenue,en,no_name,False
+neiman marcus last call,en,no_name,False
+Hans Mueller Zahnarzt,de,should_remove,True
+Dr. Klaus Schmidt Bewertungen,de,should_remove,True
+Angela Merkel Biografie,de,should_remove,True
+Thomas Muller Fussball,de,should_remove,True
+Ludwig van Beethoven Musik,de,should_remove,True
+Johann Wolfgang Goethe Zitate,de,should_remove,True
+Albert Einstein Relativitaetstheorie,de,should_remove,True
+Friedrich Schiller Dramen,de,should_remove,True
+Immanuel Kant Philosophie,de,should_remove,True
+Otto von Bismarck Geschichte,de,should_remove,True
+Karl Marx Kapital,de,should_remove,True
+Martin Luther Reformation,de,should_remove,True
+Johann Sebastian Bach Kompositionen,de,should_remove,True
+Richard Wagner Opern,de,should_remove,True
+Wolfgang Amadeus Mozart Werke,de,should_remove,True
+Franz Kafka Bucher,de,should_remove,True
+Hermann Hesse Romane,de,should_remove,True
+Sigmund Freud Psychoanalyse,de,should_remove,True
+Heinrich Heine Gedichte,de,should_remove,True
+Friedrich Nietzsche Zitate,de,should_remove,True
+Sebastian Vettel Formel eins,de,should_remove,True
+Michael Schumacher Karriere,de,should_remove,True
+Boris Becker Tennis,de,should_remove,True
+Steffi Graf Turniere,de,should_remove,True
+Dirk Nowitzki Basketball,de,should_remove,True
+Manuel Neuer Torwart,de,should_remove,True
+schwarz schuhe kaufen,de,common_word,False
+weiss hochzeitskleid,de,common_word,False
+gruen smoothie rezept,de,common_word,False
+braun lederjacke,de,common_word,False
+gold ring verlobung,de,common_word,False
+silber kette guenstig,de,common_word,False
+rot wein empfehlung,de,common_word,False
+blau himmel foto,de,common_word,False
+gelb blumen bedeutung,de,common_word,False
+rosa kleid sommer,de,common_word,False
+grau wintermantel,de,common_word,False
+violett blumen garten,de,common_word,False
+orange saft rezept,de,common_word,False
+koenig bett groesse,de,common_word,False
+bauer markt bio,de,common_word,False
+fischer zubehoer angeln,de,common_word,False
+mueller drogerie angebote,de,common_word,False
+schneider naehmaschine,de,common_word,False
+weber grill zubehoer,de,common_word,False
+baecker brot rezept,de,common_word,False
+koch rezepte einfach,de,common_word,False
+jaeger schnitzel rezept,de,common_word,False
+wald wanderung herbst,de,common_word,False
+berg wandern alpen,de,common_word,False
+see urlaub deutschland,de,common_word,False
+fluss kreuzfahrt europa,de,common_word,False
+tal weinprobe mosel,de,common_word,False
+beste pizza rezept,de,no_name,False
+wetter heute berlin,de,no_name,False
+wie kocht man nudeln,de,no_name,False
+guenstige fluege europa,de,no_name,False
+supermarkt oeffnungszeiten,de,no_name,False
+auto kaufen gebraucht,de,no_name,False
+wohnung mieten muenchen,de,no_name,False
+stellenangebote berlin,de,no_name,False
+rezept apfelkuchen einfach,de,no_name,False
+zugverbindung hamburg koeln,de,no_name,False
+fahrrad reparieren anleitung,de,no_name,False
+fussball bundesliga ergebnisse,de,no_name,False
+corona regeln aktuell,de,no_name,False
+steuererklarung online machen,de,no_name,False
+urlaub buchen guenstig,de,no_name,False
+handy vertrag wechseln,de,no_name,False
+internet anbieter vergleich,de,no_name,False
+versicherung kuendigen vorlage,de,no_name,False
+bank konto eroeffnen,de,no_name,False
+fitness studio angebote,de,no_name,False
+yoga uebungen anfaenger,de,no_name,False
+meditation lernen kostenlos,de,no_name,False
+kochen lernen grundlagen,de,no_name,False
+backen ohne zucker,de,no_name,False
+garten tipps fruehling,de,no_name,False
+heimwerken projekte einfach,de,no_name,False
+stricken anleitung schal,de,no_name,False
+Juan Garcia dentista cerca,es,should_remove,True
+Maria Rodriguez abogada,es,should_remove,True
+Lionel Messi goles,es,should_remove,True
+negro zapatos comprar,es,common_word,False
+blanco vestido novia,es,common_word,False
+verde batido receta,es,common_word,False
+mejor receta pizza,es,no_name,False
+tiempo hoy madrid,es,no_name,False
+como cocinar arroz,es,no_name,False
+vuelos baratos europa,es,no_name,False
+Jean Dupont dentiste,fr,should_remove,True
+Marie Curie recherche,fr,should_remove,True
+Emmanuel Macron discours,fr,should_remove,True
+noir chaussures achat,fr,common_word,False
+blanc robe mariee,fr,common_word,False
+vert smoothie recette,fr,common_word,False
+meilleure recette pizza,fr,no_name,False
+meteo paris aujourdhui,fr,no_name,False
+comment cuisiner pates,fr,no_name,False
+vols pas cher europe,fr,no_name,False
