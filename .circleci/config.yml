@@ -20,4 +20,3 @@ workflows:
       - python/test:
           version: '3.10'
           app-dir: nightly-job/ 
-          test-tool-args: --asyncio-mode strict 

@@ -3,7 +3,6 @@ from google.cloud import bigquery
 from google.cloud.bigquery import table
 from datetime import date, datetime, timedelta, timezone
 from pandas import DataFrame
-import asyncio
 import re
 import json
 import string
@@ -27,7 +26,7 @@ def load_nlp_model():
     return spacy.load("en_core_web_lg", exclude=["tagger", "parser", "attribute_ruler", "lemmatizer"])
 
 
-async def detect_pii(series, census_surnames, nlp):
+def detect_pii(series, census_surnames, nlp):
     """
     Arguments:
     - series: A dataframe series of search queries as strings
@@ -102,13 +101,11 @@ async def detect_pii(series, census_surnames, nlp):
     query_data = list(zip(indices_needing_nlp, texts_needing_nlp, docs))
 
     for idx, query_text, doc in query_data:
-        task = asyncio.ensure_future(mutate_risk(pii_risk=pii_risk, run_data=run_data, language_data=language_data, idx=idx, query_info=(query_text, doc), census_surnames=census_surnames))
-        tasks.append(task)
-    await asyncio.gather(*tasks, return_exceptions=True)
+        mutate_risk(pii_risk=pii_risk, run_data=run_data, language_data=language_data, idx=idx, query_info=(query_text, doc), census_surnames=census_surnames)
     return pii_risk, run_data, language_data
 
 
-async def mutate_risk(pii_risk, run_data, language_data, idx, query_info, census_surnames):
+def mutate_risk(pii_risk, run_data, language_data, idx, query_info, census_surnames):
     """
     Sets mask value at index True if search query contains "@", a number, or 
     a name as determined by spaCy named entity recognition.

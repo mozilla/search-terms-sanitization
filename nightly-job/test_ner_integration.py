@@ -47,8 +47,7 @@ def test_data():
 class TestNERIntegrationEnglish:
     """Integration tests for English language queries."""
 
-    @pytest.mark.asyncio
-    async def test_english_names_should_be_removed(self, nlp_model, test_data):
+    def test_english_names_should_be_removed(self, nlp_model, test_data):
         """
         Queries containing clear person names (like 'John Smith', 'Barack Obama', etc.)
         should be flagged for removal by spaCy NER.
@@ -58,7 +57,7 @@ class TestNERIntegrationEnglish:
         ]
 
         queries = pd.Series(english_should_remove['query'].tolist())
-        pii_risk, run_data, _ = await detect_pii(queries, TEST_CENSUS_SURNAMES, nlp_model)
+        pii_risk, run_data, _ = detect_pii(queries, TEST_CENSUS_SURNAMES, nlp_model)
 
         correctly_flagged = sum(pii_risk)
         total = len(pii_risk)
@@ -76,8 +75,7 @@ class TestNERIntegrationEnglish:
             "Expected some names to be detected via NER, but num_terms_name_detected was 0"
         )
 
-    @pytest.mark.asyncio
-    async def test_english_common_words_should_not_be_removed(self, nlp_model, test_data):
+    def test_english_common_words_should_not_be_removed(self, nlp_model, test_data):
         """
         Queries containing common words that happen to also be surnames
         (like 'black shoes', 'white wedding dress', 'rose gold ring')
@@ -88,7 +86,7 @@ class TestNERIntegrationEnglish:
         ]
 
         queries = pd.Series(english_common_word['query'].tolist())
-        pii_risk, run_data, _ = await detect_pii(queries, TEST_CENSUS_SURNAMES, nlp_model)
+        pii_risk, run_data, _ = detect_pii(queries, TEST_CENSUS_SURNAMES, nlp_model)
 
         # Count how many were correctly NOT flagged
         correctly_not_flagged = sum(1 for risk in pii_risk if not risk)
@@ -103,8 +101,7 @@ class TestNERIntegrationEnglish:
             f"run_data: {run_data}"
         )
 
-    @pytest.mark.asyncio
-    async def test_english_no_names_should_not_be_removed(self, nlp_model, test_data):
+    def test_english_no_names_should_not_be_removed(self, nlp_model, test_data):
         """
         Queries containing no names at all (like 'best pizza recipes', 'weather forecast')
         should NOT be flagged for removal.
@@ -114,7 +111,7 @@ class TestNERIntegrationEnglish:
         ]
 
         queries = pd.Series(english_no_name['query'].tolist())
-        pii_risk, run_data, _ = await detect_pii(queries, TEST_CENSUS_SURNAMES, nlp_model)
+        pii_risk, run_data, _ = detect_pii(queries, TEST_CENSUS_SURNAMES, nlp_model)
 
         # Count how many were correctly NOT flagged
         correctly_not_flagged = sum(1 for risk in pii_risk if not risk)
@@ -143,8 +140,7 @@ class TestNERIntegrationGerman:
     If German NER accuracy is important, consider adding de_core_news_lg model.
     """
 
-    @pytest.mark.asyncio
-    async def test_german_names_removal_rate(self, nlp_model, test_data):
+    def test_german_names_removal_rate(self, nlp_model, test_data):
         """
         Test NER detection of German names.
 
@@ -157,7 +153,7 @@ class TestNERIntegrationGerman:
         ]
 
         queries = pd.Series(german_should_remove['query'].tolist())
-        pii_risk, run_data, _ = await detect_pii(queries, TEST_CENSUS_SURNAMES, nlp_model)
+        pii_risk, run_data, _ = detect_pii(queries, TEST_CENSUS_SURNAMES, nlp_model)
 
         correctly_flagged = sum(pii_risk)
         total = len(pii_risk)
@@ -171,8 +167,7 @@ class TestNERIntegrationGerman:
             f"run_data: {run_data}"
         )
 
-    @pytest.mark.asyncio
-    async def test_german_common_words_false_positive_rate(self, nlp_model, test_data):
+    def test_german_common_words_false_positive_rate(self, nlp_model, test_data):
         """
         Track false positive rate on German common word queries.
         """
@@ -181,7 +176,7 @@ class TestNERIntegrationGerman:
         ]
 
         queries = pd.Series(german_common_word['query'].tolist())
-        pii_risk, run_data, _ = await detect_pii(queries, TEST_CENSUS_SURNAMES, nlp_model)
+        pii_risk, run_data, _ = detect_pii(queries, TEST_CENSUS_SURNAMES, nlp_model)
 
         correctly_not_flagged = sum(1 for risk in pii_risk if not risk)
         total = len(pii_risk)
@@ -195,8 +190,7 @@ class TestNERIntegrationGerman:
             f"run_data: {run_data}"
         )
 
-    @pytest.mark.asyncio
-    async def test_german_no_names_false_positive_rate(self, nlp_model, test_data):
+    def test_german_no_names_false_positive_rate(self, nlp_model, test_data):
         """
         Track false positive rate on German no-name queries.
 
@@ -208,7 +202,7 @@ class TestNERIntegrationGerman:
         ]
 
         queries = pd.Series(german_no_name['query'].tolist())
-        pii_risk, run_data, _ = await detect_pii(queries, TEST_CENSUS_SURNAMES, nlp_model)
+        pii_risk, run_data, _ = detect_pii(queries, TEST_CENSUS_SURNAMES, nlp_model)
 
         correctly_not_flagged = sum(1 for risk in pii_risk if not risk)
         total = len(pii_risk)
@@ -232,8 +226,7 @@ class TestNERIntegrationSpanish:
     "verde", "mejor", "vuelos" may be incorrectly flagged as PERSON entities.
     """
 
-    @pytest.mark.asyncio
-    async def test_spanish_names_removal_rate(self, nlp_model, test_data):
+    def test_spanish_names_removal_rate(self, nlp_model, test_data):
         """
         Test NER detection of Spanish names.
         Small sample size (3 queries) so we just check detection occurs.
@@ -243,7 +236,7 @@ class TestNERIntegrationSpanish:
         ]
 
         queries = pd.Series(spanish_should_remove['query'].tolist())
-        pii_risk, run_data, _ = await detect_pii(queries, TEST_CENSUS_SURNAMES, nlp_model)
+        pii_risk, _, _ = detect_pii(queries, TEST_CENSUS_SURNAMES, nlp_model)
 
         correctly_flagged = sum(pii_risk)
         total = len(pii_risk)
@@ -255,8 +248,7 @@ class TestNERIntegrationSpanish:
             f"Queries: {queries.tolist()}"
         )
 
-    @pytest.mark.asyncio
-    async def test_spanish_common_words_false_positive_rate(self, nlp_model, test_data):
+    def test_spanish_common_words_false_positive_rate(self, nlp_model, test_data):
         """
         Track false positive rate on Spanish common word queries.
 
@@ -268,7 +260,7 @@ class TestNERIntegrationSpanish:
         ]
 
         queries = pd.Series(spanish_common_word['query'].tolist())
-        pii_risk, run_data, _ = await detect_pii(queries, TEST_CENSUS_SURNAMES, nlp_model)
+        pii_risk, _, _ = detect_pii(queries, TEST_CENSUS_SURNAMES, nlp_model)
 
         correctly_not_flagged = sum(1 for risk in pii_risk if not risk)
         total = len(pii_risk)
@@ -279,8 +271,7 @@ class TestNERIntegrationSpanish:
             f"but all were incorrectly flagged as containing names."
         )
 
-    @pytest.mark.asyncio
-    async def test_spanish_no_names_false_positive_rate(self, nlp_model, test_data):
+    def test_spanish_no_names_false_positive_rate(self, nlp_model, test_data):
         """
         Track false positive rate on Spanish no-name queries.
         """
@@ -289,7 +280,7 @@ class TestNERIntegrationSpanish:
         ]
 
         queries = pd.Series(spanish_no_name['query'].tolist())
-        pii_risk, run_data, _ = await detect_pii(queries, TEST_CENSUS_SURNAMES, nlp_model)
+        pii_risk, _, _ = detect_pii(queries, TEST_CENSUS_SURNAMES, nlp_model)
 
         correctly_not_flagged = sum(1 for risk in pii_risk if not risk)
         total = len(pii_risk)
@@ -304,8 +295,7 @@ class TestNERIntegrationSpanish:
 class TestNERIntegrationFrench:
     """Integration tests for French language queries."""
 
-    @pytest.mark.asyncio
-    async def test_french_names_removal_rate(self, nlp_model, test_data):
+    def test_french_names_removal_rate(self, nlp_model, test_data):
         """
         Test NER detection of French names.
         Small sample size (3 queries) so we just check detection occurs.
@@ -315,7 +305,7 @@ class TestNERIntegrationFrench:
         ]
 
         queries = pd.Series(french_should_remove['query'].tolist())
-        pii_risk, run_data, _ = await detect_pii(queries, TEST_CENSUS_SURNAMES, nlp_model)
+        pii_risk, _, _ = detect_pii(queries, TEST_CENSUS_SURNAMES, nlp_model)
 
         correctly_flagged = sum(pii_risk)
         total = len(pii_risk)
@@ -327,15 +317,14 @@ class TestNERIntegrationFrench:
             f"Queries: {queries.tolist()}"
         )
 
-    @pytest.mark.asyncio
-    async def test_french_common_words_should_not_be_removed(self, nlp_model, test_data):
+    def test_french_common_words_should_not_be_removed(self, nlp_model, test_data):
         """French queries with common words (colors) should not be flagged."""
         french_common_word = test_data[
             (test_data['language'] == 'fr') & (test_data['category'] == 'common_word')
         ]
 
         queries = pd.Series(french_common_word['query'].tolist())
-        pii_risk, run_data, _ = await detect_pii(queries, TEST_CENSUS_SURNAMES, nlp_model)
+        pii_risk, _, _ = detect_pii(queries, TEST_CENSUS_SURNAMES, nlp_model)
 
         correctly_not_flagged = sum(1 for risk in pii_risk if not risk)
         total = len(pii_risk)
@@ -345,15 +334,14 @@ class TestNERIntegrationFrench:
             f"but only {correctly_not_flagged} were correctly kept."
         )
 
-    @pytest.mark.asyncio
-    async def test_french_no_names_should_not_be_removed(self, nlp_model, test_data):
+    def test_french_no_names_should_not_be_removed(self, nlp_model, test_data):
         """French queries with no names should not be flagged."""
         french_no_name = test_data[
             (test_data['language'] == 'fr') & (test_data['category'] == 'no_name')
         ]
 
         queries = pd.Series(french_no_name['query'].tolist())
-        pii_risk, run_data, _ = await detect_pii(queries, TEST_CENSUS_SURNAMES, nlp_model)
+        pii_risk, _, _ = detect_pii(queries, TEST_CENSUS_SURNAMES, nlp_model)
 
         correctly_not_flagged = sum(1 for risk in pii_risk if not risk)
         total = len(pii_risk)
@@ -367,15 +355,14 @@ class TestNERIntegrationFrench:
 class TestNERIntegrationSummary:
     """Summary statistics across all languages."""
 
-    @pytest.mark.asyncio
-    async def test_overall_should_remove_detection(self, nlp_model, test_data):
+    def test_overall_should_remove_detection(self, nlp_model, test_data):
         """
         Aggregate test: Verify overall name detection rate across all languages.
         """
         should_remove = test_data[test_data['category'] == 'should_remove']
 
         queries = pd.Series(should_remove['query'].tolist())
-        pii_risk, run_data, _ = await detect_pii(queries, TEST_CENSUS_SURNAMES, nlp_model)
+        pii_risk, _, _ = detect_pii(queries, TEST_CENSUS_SURNAMES, nlp_model)
 
         correctly_flagged = sum(pii_risk)
         total = len(pii_risk)
@@ -389,8 +376,7 @@ class TestNERIntegrationSummary:
             f"num_terms_name_detected: {run_data['num_terms_name_detected']}"
         )
 
-    @pytest.mark.asyncio
-    async def test_overall_should_keep_accuracy(self, nlp_model, test_data):
+    def test_overall_should_keep_accuracy(self, nlp_model, test_data):
         """
         Aggregate test: Verify overall false positive rate (queries wrongly flagged).
 
@@ -404,7 +390,7 @@ class TestNERIntegrationSummary:
         should_keep = test_data[test_data['category'].isin(['common_word', 'no_name'])]
 
         queries = pd.Series(should_keep['query'].tolist())
-        pii_risk, run_data, _ = await detect_pii(queries, TEST_CENSUS_SURNAMES, nlp_model)
+        pii_risk, _, _ = detect_pii(queries, TEST_CENSUS_SURNAMES, nlp_model)
 
         correctly_not_flagged = sum(1 for risk in pii_risk if not risk)
         total = len(pii_risk)
@@ -418,8 +404,7 @@ class TestNERIntegrationSummary:
             f"Note: Lower accuracy is expected due to English model on German/Spanish text."
         )
 
-    @pytest.mark.asyncio
-    async def test_data_distribution_sanity_check(self, test_data):
+    def test_data_distribution_sanity_check(self, test_data):
         """
         Verify the test data has the expected distribution.
         """
