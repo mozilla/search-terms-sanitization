@@ -8,9 +8,23 @@ import re
 import json
 import string
 import logging
+import spacy
 
 UTC = timezone.utc
 logger = logging.getLogger('sanitation_job')
+
+
+def load_nlp_model():
+    """
+    Load the spaCy NER model with only the components needed for PII detection.
+
+    This function should be used in production model load AND tests for consistency.
+    Only includes: tok2vec (required for NER) and ner (for PERSON detection).
+    Excludes: tagger, parser, attribute_ruler, lemmatizer.
+
+    Note: The language_detector pipe must be added separately after loading.
+    """
+    return spacy.load("en_core_web_lg", exclude=["tagger", "parser", "attribute_ruler", "lemmatizer"])
 
 
 async def detect_pii(series, census_surnames, nlp):

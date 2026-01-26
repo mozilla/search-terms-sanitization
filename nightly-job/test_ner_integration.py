@@ -18,11 +18,10 @@ This is intentional - we're testing actual system behavior with multilingual inp
 
 import pytest
 import pandas as pd
-import spacy
 import spacy_fastlang
 import os
 from pathlib import Path
-from query_sanitization import detect_pii
+from query_sanitization import detect_pii, load_nlp_model
 
 # Use a minimal set of census surnames for testing
 # We're not testing census surname detection here, just NER
@@ -34,7 +33,7 @@ TEST_DATA_PATH = Path(__file__).parent / "test_data" / "ner_integration_test_dat
 @pytest.fixture(scope="module")
 def nlp_model():
     """Load the spaCy model once for all tests in this module."""
-    nlp = spacy.load("en_core_web_lg")
+    nlp = load_nlp_model()
     nlp.add_pipe("language_detector")
     return nlp
 
