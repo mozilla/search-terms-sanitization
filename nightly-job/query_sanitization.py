@@ -56,7 +56,6 @@ def detect_pii(series, census_surnames, nlp):
     # spaCy chokes when asked to evaluate 'None' instead of a text string
     series.fillna("FX_RECEIVED_EMPTY_QUERY", inplace=True)
     texts = list(series)
-    tasks = []
 
     logger.info("checkpoint_pii_1: Starting filter for numbers and @", extra={
         "checkpoint_delta_seconds": 0,
