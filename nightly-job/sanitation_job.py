@@ -24,6 +24,7 @@ parser.add_argument("--run_date", help="Date to run sanitization over. Defaults 
 parser.add_argument("--sanitized_term_destination", help="Destination table for sanitary search terms")
 parser.add_argument("--job_reporting_destination", help="Destination table for sanitation job metadata")
 parser.add_argument("--unsanitized_term_sample_destination", help="Destination table for a sample of unsanitized search terms")
+parser.add_argument("--nlp_n_process", type=int, default=1, help="Number of processes for spaCy NLP pipeline")
 args = parser.parse_args()
 
 df = pd.read_csv('Names_2010Census.csv')
@@ -114,7 +115,7 @@ def run_sanitation(args):
             })
             last_checkpoint = now
 
-            pii_in_query_mask, run_data, language_data = detect_pii(unsanitized_unallowlisted_terms['query'], census_surnames, nlp)
+            pii_in_query_mask, run_data, language_data = detect_pii(unsanitized_unallowlisted_terms['query'], census_surnames, nlp, n_process=args.nlp_n_process)
 
             now = datetime.now(UTC)
             logger.info("checkpoint_6: PII detection completed", extra={

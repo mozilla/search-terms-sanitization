@@ -25,8 +25,7 @@ def load_nlp_model():
     """
     return spacy.load("en_core_web_lg", exclude=["tagger", "parser", "attribute_ruler", "lemmatizer"])
 
-
-def detect_pii(series, census_surnames, nlp):
+def detect_pii(series, census_surnames, nlp, n_process=1):
     """
     Arguments:
     - series: A dataframe series of search queries as strings
@@ -89,7 +88,7 @@ def detect_pii(series, census_surnames, nlp):
         "checkpoint_delta_seconds": 0,
     })
 
-    docs = list(nlp.pipe(texts_needing_nlp))
+    docs = list(nlp.pipe(texts_needing_nlp, n_process=n_process))
 
     now = datetime.now(timezone.utc)
     logger.info("checkpoint_pii_2: NLP processing completed", extra={
