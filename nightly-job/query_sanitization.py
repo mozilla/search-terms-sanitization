@@ -3,6 +3,7 @@ from google.cloud import bigquery
 from google.cloud.bigquery import table
 from datetime import date, datetime, timedelta, timezone
 from pandas import DataFrame
+import os
 import re
 import json
 import string
@@ -11,6 +12,22 @@ import spacy
 
 UTC = timezone.utc
 logger = logging.getLogger('sanitation_job')
+
+
+def resolve_nlp_n_process(cli_value):
+    """
+    Resolve the number of NLP processes from CLI arg, env var, or default.
+
+    Precedence: CLI arg > NLP_N_PROCESS env var > 1
+
+    (So the default is 1 process if not otherwise specified).
+    """
+    if cli_value is not None:
+        return cli_value
+    env_value = os.environ.get("NLP_N_PROCESS")
+    if env_value is not None:
+        return int(env_value)
+    return 1
 
 
 def load_nlp_model():

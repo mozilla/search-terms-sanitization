@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 import argparse
 import logging
 
-from query_sanitization import get_initial_term_stats, parse_run_date, stream_search_terms, detect_pii, export_search_queries_to_bigquery, export_sample_to_bigquery, record_job_metadata, load_nlp_model
+from query_sanitization import get_initial_term_stats, parse_run_date, stream_search_terms, detect_pii, export_search_queries_to_bigquery, export_sample_to_bigquery, record_job_metadata, load_nlp_model, resolve_nlp_n_process
 import logging_config
 import numpy
 import pandas as pd
@@ -24,7 +24,7 @@ parser.add_argument("--run_date", help="Date to run sanitization over. Defaults 
 parser.add_argument("--sanitized_term_destination", help="Destination table for sanitary search terms")
 parser.add_argument("--job_reporting_destination", help="Destination table for sanitation job metadata")
 parser.add_argument("--unsanitized_term_sample_destination", help="Destination table for a sample of unsanitized search terms")
-parser.add_argument("--nlp_n_process", type=int, default=1, help="Number of processes for spaCy NLP pipeline")
+parser.add_argument("--nlp_n_process", type=int, default=None, help="Number of processes for spaCy NLP pipeline")
 args = parser.parse_args()
 
 df = pd.read_csv('Names_2010Census.csv')
@@ -115,7 +115,11 @@ def run_sanitation(args):
             })
             last_checkpoint = now
 
+<<<<<<< HEAD
             pii_in_query_mask, run_data, language_data = detect_pii(unsanitized_unallowlisted_terms['query'], census_surnames, nlp, n_process=args.nlp_n_process)
+=======
+            pii_in_query_mask, run_data, language_data = await detect_pii(unsanitized_unallowlisted_terms['query'], census_surnames, nlp, n_process=resolve_nlp_n_process(args.nlp_n_process))
+>>>>>>> 7e71fee (Make nlp_n_processes configurable via env var as well as CLI argument)
 
             now = datetime.now(UTC)
             logger.info("checkpoint_6: PII detection completed", extra={
