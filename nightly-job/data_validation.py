@@ -4,7 +4,6 @@ from collections import namedtuple
 
 import numpy as np
 import pandas as pd
-import asyncio
 import re
 import json
 import string

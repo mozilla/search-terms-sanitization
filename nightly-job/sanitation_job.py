@@ -6,7 +6,6 @@ from query_sanitization import get_initial_term_stats, parse_run_date, stream_se
 import logging_config
 import numpy
 import pandas as pd
-import asyncio
 import spacy_fastlang
 
 import collections
@@ -30,7 +29,7 @@ args = parser.parse_args()
 df = pd.read_csv('Names_2010Census.csv')
 census_surnames = set(str(name).lower() for name in df.name)
 
-async def run_sanitation(args):
+def run_sanitation(args):
     start_time = datetime.now(UTC)
     last_checkpoint = start_time
 
@@ -115,7 +114,7 @@ async def run_sanitation(args):
             })
             last_checkpoint = now
 
-            pii_in_query_mask, run_data, language_data = await detect_pii(unsanitized_unallowlisted_terms['query'], census_surnames, nlp)
+            pii_in_query_mask, run_data, language_data = detect_pii(unsanitized_unallowlisted_terms['query'], census_surnames, nlp)
 
             now = datetime.now(UTC)
             logger.info("checkpoint_6: PII detection completed", extra={
@@ -215,4 +214,4 @@ async def run_sanitation(args):
         "checkpoint_delta_seconds": (now - last_checkpoint).total_seconds(),
     })
 
-asyncio.run(run_sanitation(args=args))
+run_sanitation(args=args)

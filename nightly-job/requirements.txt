@@ -7,7 +7,6 @@ db-dtypes==1.2.0
 dockerflow==2024.4.1
 
 pytest==8.1.1
-pytest-asyncio==0.23.6
 
 # https://spacy.io/usage/models#models-download
 # https://spacy.io/models/en#en_core_web_lg
