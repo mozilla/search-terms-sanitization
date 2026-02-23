@@ -3,6 +3,7 @@ from google.cloud import bigquery
 from google.cloud.bigquery import table
 from datetime import date, datetime, timedelta, timezone
 from pandas import DataFrame
+import os
 import re
 import json
 import string
@@ -11,6 +12,22 @@ import spacy
 
 UTC = timezone.utc
 logger = logging.getLogger('sanitation_job')
+
+
+def resolve_nlp_n_process(cli_value):
+    """
+    Resolve the number of NLP processes from CLI arg, env var, or default.
+
+    Precedence: CLI arg > NLP_N_PROCESS env var > 1
+
+    (So the default is 1 process if not otherwise specified).
+    """
+    if cli_value is not None:
+        return cli_value
+    env_value = os.environ.get("NLP_N_PROCESS")
+    if env_value is not None:
+        return int(env_value)
+    return 1
 
 
 def load_nlp_model():
@@ -25,8 +42,7 @@ def load_nlp_model():
     """
     return spacy.load("en_core_web_lg", exclude=["tagger", "parser", "attribute_ruler", "lemmatizer"])
 
-
-def detect_pii(series, census_surnames, nlp):
+def detect_pii(series, census_surnames, nlp, n_process=1):
     """
     Arguments:
     - series: A dataframe series of search queries as strings
@@ -89,7 +105,7 @@ def detect_pii(series, census_surnames, nlp):
         "checkpoint_delta_seconds": 0,
     })
 
-    docs = list(nlp.pipe(texts_needing_nlp))
+    docs = list(nlp.pipe(texts_needing_nlp, n_process=n_process))
 
     now = datetime.now(timezone.utc)
     logger.info("checkpoint_pii_2: NLP processing completed", extra={
