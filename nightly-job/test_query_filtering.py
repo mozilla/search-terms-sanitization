@@ -58,10 +58,11 @@ def test_filter_short_queries(always_english_detector):
 
 def test_filter_present_in_allow_list(always_english_detector):
     """test that we correctly filter out rows that show up in the allow list"""
-    data = pd.DataFrame({
+    mixed_allow_list_data = {
         "query": ["allowed query", "another allowed", "not allowed query", "also not allowed"],
         "present_in_allow_list": [True, True, False, False],
-    })
+    }
+    data = pd.DataFrame.from_dict(mixed_allow_list_data)
     filtered = filter_queries_for_sanitization(always_english_detector, data)
     assert len(filtered) == 2
     assert list(filtered["query"]) == ["not allowed query", "also not allowed"]
