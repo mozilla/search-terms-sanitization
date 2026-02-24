@@ -14,13 +14,14 @@ import spacy_fastlang
 UTC = timezone.utc
 logger = logging.getLogger('sanitation_job')
 
-# If a search query is less than this length we will not sanitize it and we are going to exclude it from the output
-# data unless it is on the allow list.
+# If a search query is less than this length we will not sanitize it,
+# and we are going to exclude it from the output
+# unless it is on the allow list.
 MINIMUM_TERM_LENGTH = 6
 
-# If a search query has below this probability of being english we will not sanitize it because we don't expect the
-# model to be able to handle sanitizing strings that are not in english. Instead, we will exclude it from the output
-# data.
+# If a search query has below this probability of being english we will not sanitize it
+# because we don't expect the model to be able to handle sanitizing strings that are not in english.
+# Instead, we will exclude it from the output data.
 MINIMUM_TERM_ENGLISH_PROBABILITY = 0.2
 
 
