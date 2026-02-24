@@ -4,7 +4,6 @@ from google.cloud.bigquery import table
 from datetime import date, datetime, timedelta, timezone
 import os
 from pandas import DataFrame, Series
-import asyncio
 import re
 import json
 import string
