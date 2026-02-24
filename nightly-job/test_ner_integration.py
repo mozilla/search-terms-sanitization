@@ -38,10 +38,6 @@ def nlp_model():
     return nlp
 
 
-@pytest.fixture(scope="module")
-def test_data():
-    """Load the test data CSV."""
-    return pd.read_csv(TEST_DATA_PATH)
 
 
 class TestNERIntegrationEnglish:
