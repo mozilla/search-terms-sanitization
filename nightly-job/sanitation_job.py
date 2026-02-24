@@ -115,11 +115,7 @@ def run_sanitation(args):
             })
             last_checkpoint = now
 
-<<<<<<< HEAD
-            pii_in_query_mask, run_data, language_data = detect_pii(unsanitized_unallowlisted_terms['query'], census_surnames, nlp, n_process=args.nlp_n_process)
-=======
-            pii_in_query_mask, run_data, language_data = await detect_pii(unsanitized_unallowlisted_terms['query'], census_surnames, nlp, n_process=resolve_nlp_n_process(args.nlp_n_process))
->>>>>>> 7e71fee (Make nlp_n_processes configurable via env var as well as CLI argument)
+            pii_in_query_mask, run_data, language_data = detect_pii(unsanitized_unallowlisted_terms['query'], census_surnames, nlp, n_process=resolve_nlp_n_process(args.nlp_n_process))
 
             now = datetime.now(UTC)
             logger.info("checkpoint_6: PII detection completed", extra={
