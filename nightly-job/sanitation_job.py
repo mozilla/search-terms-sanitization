@@ -63,6 +63,8 @@ def run_sanitation(args):
     data_validation_sample_list = []
     # use exit stack to avoid extra nesting from with blocks
     cleanup = ExitStack()
+    # init as None so we can check for none in the main finally of the job
+    parquet_writer = None
 
     try:
         initial_stats = get_initial_term_stats(start_date=start_date, end_date=end_date)
@@ -241,6 +243,8 @@ def run_sanitation(args):
         )
         raise e
     finally:
+        if parquet_writer:
+            parquet_writer.close()
         cleanup.close()
 
     data_validation_sample = pd.concat(data_validation_sample_list, ignore_index=True)
