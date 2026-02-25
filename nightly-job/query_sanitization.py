@@ -2,16 +2,28 @@ from typing import Sequence
 from google.cloud import bigquery
 from google.cloud.bigquery import table
 from datetime import date, datetime, timedelta, timezone
-from pandas import DataFrame
 import os
+from pandas import DataFrame, Series
 import re
 import json
 import string
 import logging
 import spacy
+import spacy_fastlang
 
 UTC = timezone.utc
 logger = logging.getLogger('sanitation_job')
+
+# If a search query is less than this length and is not in the allowed list,
+# we will exclude it from the sanitized dataset that this job produces because we are not confident we can effectively
+# sanitize it.
+MINIMUM_TERM_LENGTH = 6
+
+# If a search query has below this probability of being english and is not in the allowed list,
+# we will exclude it from the sanitized dataset that this job produces because we are not confident we can effectively
+# sanitize it.
+MINIMUM_TERM_ENGLISH_PROBABILITY = 0.2
+
 
 
 def resolve_nlp_n_process(cli_value):
@@ -38,9 +50,43 @@ def load_nlp_model():
     Only includes: tok2vec (required for NER) and ner (for PERSON detection).
     Excludes: tagger, parser, attribute_ruler, lemmatizer.
 
-    Note: The language_detector pipe must be added separately after loading.
     """
     return spacy.load("en_core_web_lg", exclude=["tagger", "parser", "attribute_ruler", "lemmatizer"])
+
+
+def load_english_detection_model():
+    """
+    Load a spaCy model that only includes the base tokenizer and a language_detection step.
+    """
+    language_model = spacy.blank("en")
+    language_model.add_pipe("language_detector")
+    return language_model
+
+
+def filter_queries_for_sanitization(english_nlp, data: DataFrame) -> DataFrame:
+    """
+    Filter out data that we won't sanitize and will instead drop from the output.
+    Assumes that any allow list items have already been removed from `data`.
+    """
+
+    minimum_length_terms_mask = data['query'].str.len() >= MINIMUM_TERM_LENGTH
+    data = data.loc[minimum_length_terms_mask].reset_index(drop=True)
+
+    english_result_docs = english_nlp.pipe(data['query'])
+    english_mask = Series(
+        doc._.language == "en" and doc._.language_score >= MINIMUM_TERM_ENGLISH_PROBABILITY
+        for doc in english_result_docs
+    )
+    terms_to_sanitize = data.loc[english_mask]
+
+    logger.info(
+        f"filtering out {data.shape[0] - terms_to_sanitize.shape[0]}/{data.shape[0]} terms because they either do not "
+        f"meet the minimum length requirement {MINIMUM_TERM_LENGTH} or minimum english confidence "
+        f"{MINIMUM_TERM_ENGLISH_PROBABILITY}"
+    )
+
+    return terms_to_sanitize
+
 
 def detect_pii(series, census_surnames, nlp, n_process=1):
     """
@@ -449,7 +495,7 @@ def record_job_metadata(status, started_at, ended_at, destination_table_id, tota
     """
     if run_data is None:
         run_data = {}
-    
+
     client = bigquery.Client()
 
     rows_to_insert = [

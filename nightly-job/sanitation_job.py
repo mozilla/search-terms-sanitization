@@ -2,7 +2,8 @@ from datetime import datetime, timezone
 import argparse
 import logging
 
-from query_sanitization import get_initial_term_stats, parse_run_date, stream_search_terms, detect_pii, export_search_queries_to_bigquery, export_sample_to_bigquery, record_job_metadata, load_nlp_model, resolve_nlp_n_process
+from query_sanitization import get_initial_term_stats, parse_run_date, stream_search_terms, detect_pii, export_search_queries_to_bigquery, export_sample_to_bigquery, record_job_metadata, load_nlp_model, resolve_nlp_n_process, filter_queries_for_sanitization, load_english_detection_model
+
 import logging_config
 import numpy
 import pandas as pd
@@ -82,6 +83,8 @@ def run_sanitation(args):
         })
         last_checkpoint = now
 
+        english_nlp = load_english_detection_model()
+
         nlp = load_nlp_model()
         nlp.add_pipe("language_detector")
         now = datetime.now(UTC)
@@ -107,7 +110,8 @@ def run_sanitation(args):
             data_validation_sample_list.append(one_percent_sample)
 
             allow_listed_terms_page = raw_page.loc[raw_page.present_in_allow_list]
-            unsanitized_unallowlisted_terms = raw_page.loc[~raw_page.present_in_allow_list]
+
+            terms_to_sanitize = filter_queries_for_sanitization(english_nlp, raw_page.loc[~raw_page.present_in_allow_list])
 
             now = datetime.now(UTC)
             logger.info("checkpoint_5: Dataframe filtering completed", extra={
@@ -115,7 +119,7 @@ def run_sanitation(args):
             })
             last_checkpoint = now
 
-            pii_in_query_mask, run_data, language_data = detect_pii(unsanitized_unallowlisted_terms['query'], census_surnames, nlp, n_process=resolve_nlp_n_process(args.nlp_n_process))
+            pii_in_query_mask, run_data, language_data = detect_pii(terms_to_sanitize['query'], census_surnames, nlp, n_process=resolve_nlp_n_process(args.nlp_n_process))
 
             now = datetime.now(UTC)
             logger.info("checkpoint_6: PII detection completed", extra={
@@ -123,7 +127,7 @@ def run_sanitation(args):
             })
             last_checkpoint = now
             # ~ reverses the mask so we get the queries WITHOUT PII in them
-            sanitized_page = unsanitized_unallowlisted_terms.loc[~numpy.array(pii_in_query_mask)]
+            sanitized_page = terms_to_sanitize.loc[~numpy.array(pii_in_query_mask)]
 
             total_allow_listed += allow_listed_terms_page.shape[0]
             total_cleared_in_sanitation += sanitized_page.shape[0]
@@ -164,20 +168,17 @@ def run_sanitation(args):
         })
         last_checkpoint = now
 
-        end_time = datetime.now(UTC)
-
-        implementation_notes = "Run with a page_size of UNLIMITED from script"
         record_job_metadata(
             status='SUCCESS',
             started_at=start_time,
-            ended_at=end_time,
+            ended_at=datetime.now(UTC),
             destination_table_id=args.job_reporting_destination,
             total_run=total_run,
             total_allow_listed=total_allow_listed,
             total_rejected=total_run - (total_allow_listed + total_cleared_in_sanitation),
             run_data=summary_run_data,
             language_data=summary_language_data,
-            implementation_notes=implementation_notes,
+            implementation_notes="Run with a page_size of UNLIMITED from script",
             total_terms_inclusive=total_terms,
             total_blank=total_blank
         )
