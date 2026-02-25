@@ -1,3 +1,5 @@
+import math
+import multiprocessing
 from datetime import datetime, timezone
 import argparse
 import logging
@@ -37,6 +39,48 @@ args = parser.parse_args()
 df = pd.read_csv('Names_2010Census.csv')
 census_surnames = set(str(name).lower() for name in df.name)
 
+_worker_nlp = None
+_worker_census_surnames = None
+
+
+def _init_worker(census_surnames):
+    """Each worker loads the model after forking instead of trying to load once and pass without copying."""
+    global _worker_nlp, _worker_census_surnames
+    _worker_nlp = load_nlp_model()
+    _worker_nlp.add_pipe("language_detector")
+    _worker_census_surnames = census_surnames
+
+
+def _process_chunk(chunk_series):
+    """
+    Worker function: calls detect_pii on a chunk of texts.
+    Accesses nlp and census_surnames from forked process globals.
+    Returns (pii_risk, run_data, language_data) — all simple types.
+    """
+    return detect_pii(chunk_series, _worker_census_surnames, _worker_nlp, n_process=1)
+
+
+def _pooled_detect_pii(pool, n_process, series):
+    """Dispatch detect_pii across pool workers in chunks and merge results."""
+    chunk_size = math.ceil(len(series) / n_process)
+    chunks = [
+        series.iloc[i:i + chunk_size]
+        for i in range(0, len(series), chunk_size)
+    ]
+    results = pool.map(_process_chunk, chunks)
+
+    pii_in_query_mask = []
+    run_data = {key: 0 for key in results[0][1]}
+    language_data = {}
+    for chunk_pii, chunk_run_data, chunk_language_data in results:
+        pii_in_query_mask.extend(chunk_pii)
+        for key in chunk_run_data:
+            run_data[key] += chunk_run_data[key]
+        for lang, count in chunk_language_data.items():
+            language_data[lang] = language_data.get(lang, 0) + count
+    return pii_in_query_mask, run_data, language_data
+
+
 def run_sanitation(args):
     start_time = datetime.now(UTC)
     last_checkpoint = start_time
@@ -65,6 +109,8 @@ def run_sanitation(args):
     cleanup = ExitStack()
     # init as None so we can check for none in the main finally of the job
     parquet_writer = None
+
+    n_process = resolve_nlp_n_process(args.nlp_n_process)
 
     try:
         initial_stats = get_initial_term_stats(start_date=start_date, end_date=end_date)
@@ -95,13 +141,24 @@ def run_sanitation(args):
 
         english_nlp = load_english_detection_model()
 
-        nlp = load_nlp_model()
-        nlp.add_pipe("language_detector")
         now = datetime.now(UTC)
         logger.info("checkpoint_3a: spaCy model loaded", extra={
             "checkpoint_delta_seconds": (now - last_checkpoint).total_seconds(),
         })
         last_checkpoint = now
+
+        if n_process > 1:
+            pool = multiprocessing.Pool(
+                processes=n_process,
+                initializer=_init_worker,
+                initargs=(census_surnames,),
+            )
+            cleanup.enter_context(pool)
+            nlp = None
+        else:
+            pool = None
+            nlp = load_nlp_model()
+            nlp.add_pipe("language_detector")
 
         sanitized_terms_tmp = cleanup.enter_context(
             tempfile.NamedTemporaryFile(suffix=f"_sanitized_terms_{start_date}.parquet")
@@ -147,7 +204,14 @@ def run_sanitation(args):
             })
             last_checkpoint = now
 
-            pii_in_query_mask, run_data, language_data = detect_pii(terms_to_sanitize['query'], census_surnames, nlp, n_process=resolve_nlp_n_process(args.nlp_n_process))
+            if pool is not None:
+                pii_in_query_mask, run_data, language_data = _pooled_detect_pii(
+                    pool, n_process, terms_to_sanitize['query']
+                )
+            else:
+                pii_in_query_mask, run_data, language_data = detect_pii(
+                    terms_to_sanitize['query'], census_surnames, nlp, n_process=1
+                )
 
             now = datetime.now(UTC)
             logger.info("checkpoint_6: PII detection completed", extra={
@@ -264,4 +328,5 @@ def run_sanitation(args):
         "checkpoint_delta_seconds": (now - last_checkpoint).total_seconds(),
     })
 
-run_sanitation(args=args)
+if __name__ == "__main__":
+    run_sanitation(args=args)
