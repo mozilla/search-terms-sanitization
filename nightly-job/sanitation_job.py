@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 import argparse
 import logging
+import os
 import tempfile
 from contextlib import ExitStack
 
@@ -185,6 +186,7 @@ def run_sanitation(args):
             now = datetime.now(UTC)
             logger.info("checkpoint_8: Page written to local parquet", extra={
                 "checkpoint_delta_seconds": (now - last_checkpoint).total_seconds(),
+                "parquet_file_size_mb": round(os.path.getsize(sanitized_terms_tmp.name) / (1024 * 1024), 2),
             })
             last_checkpoint = now
 
