@@ -96,9 +96,11 @@ def run_sanitation(args):
     summary_run_data = {}
     summary_language_data = {}
     start_date, end_date = parse_run_date(args.run_date)
+    n_process = resolve_nlp_n_process(args.nlp_n_process)
     logger.info("Starting sanitation job", extra={
         "start_date": start_date,
         "end_date": end_date,
+        "n_nlp_processes": n_process,
     })
     logger.info("checkpoint_0: Job initialized", extra={
         "checkpoint_delta_seconds": 0,
@@ -110,7 +112,6 @@ def run_sanitation(args):
     # init as None so we can check for none in the main finally of the job
     parquet_writer = None
 
-    n_process = resolve_nlp_n_process(args.nlp_n_process)
 
     try:
         initial_stats = get_initial_term_stats(start_date=start_date, end_date=end_date)
