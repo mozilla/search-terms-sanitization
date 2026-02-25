@@ -347,63 +347,41 @@ def parse_run_date(run_date: str) -> tuple[str, str]:
     return (start_date.strftime(date_format), end_date.strftime(date_format))
 
 
-def export_search_queries_to_bigquery(dataframe: DataFrame, destination_table_id: str, date: str, delete_partition: bool):
+def export_search_queries_to_bigquery(parquet_file_path, destination_table_id: str, date: str):
     """
-    Append more queries to the BigQuery table where we are keeping sanitized search queries.
-    
+    Load sanitized search queries from a local parquet file into a BigQuery partition.
+
+    Deletes the existing partition first for idempotency, then uploads via a load job.
+
     Arguments:
-    - dataframe: A dataframe of queries to be added. Should include ONLY sanitary ones.
-        Dataframe should include a timestamp field of the timestamp type, plus all fields listed in the schema variable in this function's implementation.
+    - parquet_file_path: Path to the local parquet file containing sanitized queries.
     - destination_table_id: the fully qualified name of the table for the data to be exported into.
-    - date: The date for which these queries are being inserted. IMPORTANT: this function will overwrite EVERYTHING in the destination table at that date partition with the data in the dataframe passed in.
-    - delete_partition: Boolean to determine if we should delete the destination partition of the job.
-    
-    Returns: Nothing.
-    It does print a result value as a cursory logging mechanism. That result object can be parsed and logged to wherever we like.
+    - date: The date for which these queries are being inserted.
     """
-
-    logger.info("Inserting sanitized terms into bigquery", extra={
-        "table": destination_table_id,
-        "row_count": dataframe.shape[0],
-    })
     client = bigquery.Client()
-    
 
-    # For idempotency, we want to overwrite data on daily partitions
-    # But the BQ role granted to the sanitizer service account does not include creating tables
-    # Which WRITE_TRUNCATE to a partition requires, so the hack is to
-    # Delete existing data from today before insertion of data from today.
-    # We only delete the partition when specified through a parameter
-    
-    if delete_partition:
-        partition = datetime.fromisoformat(date).strftime("%Y%m%d")
-        deletion_target = f'{destination_table_id}${partition}'
-        logger.info("Deleting sanitized term partition", extra={"table_partition": deletion_target})
-        client.delete_table(deletion_target, not_found_ok=True)
-    
-    # Specify a (partial) schema. All columns are always written to the
-    # table. The schema is used to assist in data type definitions.
-    schema=[
-        # Specify the type of columns whose type cannot be auto-detected (particularly "object")
-            bigquery.SchemaField("request_id", bigquery.enums.SqlTypeNames.STRING),
-            bigquery.SchemaField("session_id", bigquery.enums.SqlTypeNames.STRING),
-            bigquery.SchemaField("sequence_no", bigquery.enums.SqlTypeNames.STRING),
-            bigquery.SchemaField("query", bigquery.enums.SqlTypeNames.STRING),
-            bigquery.SchemaField("country", bigquery.enums.SqlTypeNames.STRING),
-            bigquery.SchemaField("region", bigquery.enums.SqlTypeNames.STRING),
-            bigquery.SchemaField("dma", bigquery.enums.SqlTypeNames.STRING),
-            bigquery.SchemaField("form_factor", bigquery.enums.SqlTypeNames.STRING),
-            bigquery.SchemaField("browser", bigquery.enums.SqlTypeNames.STRING),
-            bigquery.SchemaField("os_family", bigquery.enums.SqlTypeNames.STRING)
-        ]
+    # For idempotency, delete existing data from today before insertion
+    partition = datetime.fromisoformat(date).strftime("%Y%m%d")
+    deletion_target = f'{destination_table_id}${partition}'
+    logger.info("Deleting sanitized term partition", extra={"table_partition": deletion_target})
+    client.delete_table(deletion_target, not_found_ok=True)
 
-    destination_table = bigquery.Table(destination_table_id, schema=schema)
-    insert_results = client.insert_rows_from_dataframe(
-        table=destination_table, dataframe=dataframe
+    job_config = bigquery.LoadJobConfig(
+        write_disposition=bigquery.WriteDisposition.WRITE_APPEND,
+        source_format=bigquery.SourceFormat.PARQUET,
     )
-    logger.info("Completed insert of sanitized terms", extra={
+
+    logger.info("Loading sanitized terms into bigquery", extra={
         "table": destination_table_id,
-        "errors": get_result_errors(insert_results),
+        "parquet_file": str(parquet_file_path),
+    })
+
+    with open(parquet_file_path, "rb") as f:
+        load_job = client.load_table_from_file(f, destination_table_id, job_config=job_config)
+    load_job.result()
+
+    logger.info("Completed loading of sanitized terms", extra={
+        "table": destination_table_id,
     })
 
 def get_result_errors(insert_results: Sequence[Sequence[dict]]) -> list[dict]:
