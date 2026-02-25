@@ -64,19 +64,20 @@ def load_english_detection_model():
 
 
 def filter_queries_for_sanitization(english_nlp, data: DataFrame) -> DataFrame:
-    """Filter out data that we won't sanitize and will instead drop from the output."""
-    unsanitized_unallowlisted_terms = data.loc[~data.present_in_allow_list]
+    """
+    Filter out data that we won't sanitize and will instead drop from the output.
+    Assumes that any allow list items have already been removed from `data`.
+    """
 
     minimum_length_terms_mask = data['query'].str.len() >= MINIMUM_TERM_LENGTH
-    unsanitized_unallowlisted_terms = unsanitized_unallowlisted_terms.loc[minimum_length_terms_mask].reset_index(
-        drop=True)
+    data = data.loc[minimum_length_terms_mask].reset_index(drop=True)
 
-    english_result_docs = english_nlp.pipe(unsanitized_unallowlisted_terms['query'])
+    english_result_docs = english_nlp.pipe(data['query'])
     english_mask = Series(
         doc._.language == "en" and doc._.language_score >= MINIMUM_TERM_ENGLISH_PROBABILITY
         for doc in english_result_docs
     )
-    terms_to_sanitize = unsanitized_unallowlisted_terms.loc[english_mask]
+    terms_to_sanitize = data.loc[english_mask]
 
     logger.info(
         f"filtering out {data.shape[0] - terms_to_sanitize.shape[0]}/{data.shape[0]} terms because they either do not "

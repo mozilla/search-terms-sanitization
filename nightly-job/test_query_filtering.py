@@ -37,8 +37,6 @@ def test_filter_non_english_queries():
         "language":["en", "de", "de", "es", "fr"],
     }
     data = pd.DataFrame.from_dict(mixed_language_queries)
-    # for the sake of this test assume nothing is in the allow list so we should filter out anything that is not english
-    data["present_in_allow_list"] = False
     language_map = dict(zip(data["query"], data["language"]))
     mock_language_detector = MockLanguageDetector(language_map)
     filtered_queries = filter_queries_for_sanitization(mock_language_detector, data)
@@ -49,23 +47,9 @@ def test_filter_short_queries():
     """test that we correctly filter out rows with queries under `MINIMUM_TERM_LENGTH`"""
     short_and_long_queries = {
         "query": ["hi", "hey", "ab", "longer query", "another long one", "search term"],
-        "present_in_allow_list": [False] * 6,
     }
     data = pd.DataFrame.from_dict(short_and_long_queries)
     always_english_detector = MockLanguageDetector(defaultdict(lambda: "en"))
     filtered = filter_queries_for_sanitization(always_english_detector, data)
     assert len(filtered) == 3
     assert list(filtered["query"]) == ["longer query", "another long one", "search term"]
-
-
-def test_filter_present_in_allow_list():
-    """test that we correctly filter out rows that show up in the allow list"""
-    mixed_allow_list_data = {
-        "query": ["allowed query", "another allowed", "not allowed query", "also not allowed"],
-        "present_in_allow_list": [True, True, False, False],
-    }
-    data = pd.DataFrame.from_dict(mixed_allow_list_data)
-    always_english_detector = MockLanguageDetector(defaultdict(lambda: "en"))
-    filtered = filter_queries_for_sanitization(always_english_detector, data)
-    assert len(filtered) == 2
-    assert list(filtered["query"]) == ["not allowed query", "also not allowed"]
