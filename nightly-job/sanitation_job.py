@@ -88,14 +88,14 @@ def run_sanitation(args):
 
         nlp = load_nlp_model()
         nlp.add_pipe("language_detector")
-        check_point("checkpoint_3a: spaCy model loaded")
+        check_point("checkpoint_4: spaCy model loaded")
 
         for idx, raw_page in enumerate(unsanitized_search_term_stream):
             logger.info("Sanitizing dataframe of search terms", extra={
                 "page_num": idx,
                 "page_size": raw_page.shape[0],
             })
-            check_point("checkpoint_4: Page received from iterator")
+            check_point("checkpoint_5: Page received from iterator")
 
             total_run += raw_page.shape[0]
 
@@ -107,11 +107,11 @@ def run_sanitation(args):
             terms_to_sanitize = filter_queries_for_sanitization(english_nlp, raw_page.loc[~raw_page.present_in_allow_list])
 
 
-            check_point("checkpoint_5: Dataframe filtering completed")
+            check_point("checkpoint_6: Dataframe filtering completed")
 
             pii_in_query_mask, run_data, language_data = detect_pii(terms_to_sanitize['query'], census_surnames, nlp, n_process=resolve_nlp_n_process(args.nlp_n_process))
 
-            check_point("checkpoint_6: PII detection completed")
+            check_point("checkpoint_7: PII detection completed")
 
             # ~ reverses the mask so we get the queries WITHOUT PII in them
             sanitized_page = terms_to_sanitize.loc[~numpy.array(pii_in_query_mask)]
@@ -129,7 +129,7 @@ def run_sanitation(args):
 
             delete_destination_partition = idx == 0
 
-            check_point("checkpoint_7: Starting BigQuery export")
+            check_point("checkpoint_8: Starting BigQuery export")
 
             export_search_queries_to_bigquery(
                 dataframe=all_terms_to_keep,
@@ -138,10 +138,10 @@ def run_sanitation(args):
                 delete_partition=delete_destination_partition
             )
 
-            check_point("checkpoint_8: BigQuery export completed")
+            check_point("checkpoint_9: BigQuery export completed")
 
 
-        check_point("checkpoint_9: All pages processed")
+        check_point("checkpoint_10: All pages processed")
 
         record_job_metadata(
             status='SUCCESS',
@@ -158,7 +158,7 @@ def run_sanitation(args):
             total_blank=total_blank
         )
 
-        check_point("checkpoint_10: Job metadata recorded")
+        check_point("checkpoint_11: Job metadata recorded")
 
     except Exception as e:
         record_job_metadata(
@@ -173,10 +173,10 @@ def run_sanitation(args):
     data_validation_sample = pd.concat(data_validation_sample_list, ignore_index=True)
     data_validation_sample = data_validation_sample.drop(columns=['present_in_allow_list'])
 
-    check_point("checkpoint_11: Starting validation sample export")
+    check_point("checkpoint_12: Starting validation sample export")
     export_sample_to_bigquery(dataframe=data_validation_sample, sample_table_id=args.unsanitized_term_sample_destination, date=start_date)
     logger.info("Sanitation job complete!")
 
-    check_point("checkpoint_12: Job complete")
+    check_point("checkpoint_13: Job complete")
 
 run_sanitation(args=args)
