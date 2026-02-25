@@ -164,18 +164,18 @@ def detect_pii(series, census_surnames, nlp, n_process=1):
     spaCy doc on data copying behavior per start method: https://spacy.io/usage/processing-pipelines
     Python doc on process start methods: https://docs.python.org/3/library/multiprocessing.html#contexts-and-start-methods
     '''
-    docs = list(nlp.pipe(texts_needing_nlp, n_process=n_process))
+    docs = nlp.pipe(texts_needing_nlp, n_process=n_process)
 
+
+    query_data = zip(indices_needing_nlp, texts_needing_nlp, docs)
+
+    for idx, query_text, doc in query_data:
+        mutate_risk(pii_risk=pii_risk, run_data=run_data, language_data=language_data, idx=idx, query_info=(query_text, doc), census_surnames=census_surnames)
     now = datetime.now(timezone.utc)
     logger.info("checkpoint_pii_2: NLP processing completed", extra={
         "checkpoint_delta_seconds": (now - last_checkpoint).total_seconds(),
     })
     last_checkpoint = now
-
-    query_data = list(zip(indices_needing_nlp, texts_needing_nlp, docs))
-
-    for idx, query_text, doc in query_data:
-        mutate_risk(pii_risk=pii_risk, run_data=run_data, language_data=language_data, idx=idx, query_info=(query_text, doc), census_surnames=census_surnames)
     return pii_risk, run_data, language_data
 
 
