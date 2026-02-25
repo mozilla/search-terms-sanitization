@@ -1,6 +1,12 @@
 from datetime import datetime, timezone
 import argparse
 import logging
+import os
+import tempfile
+from contextlib import ExitStack
+
+import pyarrow as pa
+import pyarrow.parquet as pq
 
 from query_sanitization import get_initial_term_stats, parse_run_date, stream_search_terms, detect_pii, export_search_queries_to_bigquery, export_sample_to_bigquery, record_job_metadata, load_nlp_model, resolve_nlp_n_process, filter_queries_for_sanitization, load_english_detection_model
 
@@ -55,6 +61,10 @@ def run_sanitation(args):
     })
 
     data_validation_sample_list = []
+    # use exit stack to avoid extra nesting from with blocks
+    cleanup = ExitStack()
+    # init as None so we can check for none in the main finally of the job
+    parquet_writer = None
 
     try:
         initial_stats = get_initial_term_stats(start_date=start_date, end_date=end_date)
@@ -92,6 +102,24 @@ def run_sanitation(args):
             "checkpoint_delta_seconds": (now - last_checkpoint).total_seconds(),
         })
         last_checkpoint = now
+
+        sanitized_terms_tmp = cleanup.enter_context(
+            tempfile.NamedTemporaryFile(suffix=f"_sanitized_terms_{start_date}.parquet")
+        )
+        sanitized_terms_schema = pa.schema([
+            ("timestamp", pa.timestamp("us", tz="UTC")),
+            ("request_id", pa.string()),
+            ("session_id", pa.string()),
+            ("sequence_no", pa.string()),
+            ("query", pa.string()),
+            ("country", pa.string()),
+            ("region", pa.string()),
+            ("dma", pa.string()),
+            ("form_factor", pa.string()),
+            ("browser", pa.string()),
+            ("os_family", pa.string()),
+        ])
+        parquet_writer = pq.ParquetWriter(sanitized_terms_tmp.name, sanitized_terms_schema)
 
         for idx, raw_page in enumerate(unsanitized_search_term_stream):
             page_start = datetime.now(UTC)
@@ -140,30 +168,46 @@ def run_sanitation(args):
             all_terms_to_keep = pd.concat([allow_listed_terms_page, sanitized_page])
             all_terms_to_keep = all_terms_to_keep.drop(columns=['present_in_allow_list'])
 
-            delete_destination_partition = idx == 0
+            # Cast columns that may arrive as non-string dtypes (e.g. float64 due to nulls) so that pyarrow knows how to
+            # handle them
+            all_terms_to_keep = all_terms_to_keep.astype({
+                "request_id": "string", "session_id": "string", "sequence_no": "string",
+                "query": "string", "country": "string", "region": "string",
+                "dma": "string", "form_factor": "string", "browser": "string",
+                "os_family": "string",
+            })
 
             now = datetime.now(UTC)
-            logger.info("checkpoint_7: Starting BigQuery export", extra={
+            logger.info("checkpoint_7: Data preparation for write done", extra={
                 "checkpoint_delta_seconds": (now - last_checkpoint).total_seconds(),
             })
             last_checkpoint = now
 
-            export_search_queries_to_bigquery(
-                dataframe=all_terms_to_keep,
-                destination_table_id=args.sanitized_term_destination,
-                date=start_date,
-                delete_partition=delete_destination_partition
-            )
+            parquet_writer.write_table(pa.Table.from_pandas(all_terms_to_keep, schema=sanitized_terms_schema))
 
             now = datetime.now(UTC)
-            logger.info("checkpoint_8: BigQuery export completed", extra={
+            logger.info("checkpoint_8: Page written to local parquet", extra={
                 "checkpoint_delta_seconds": (now - last_checkpoint).total_seconds(),
+                "parquet_file_size_mb": round(os.path.getsize(sanitized_terms_tmp.name) / (1024 * 1024), 2),
             })
             last_checkpoint = now
 
+        parquet_writer.close()
 
         now = datetime.now(UTC)
-        logger.info("checkpoint_9: All pages processed", extra={
+        logger.info("checkpoint_9: All pages processed, starting BigQuery export", extra={
+            "checkpoint_delta_seconds": (now - last_checkpoint).total_seconds(),
+        })
+        last_checkpoint = now
+
+        export_search_queries_to_bigquery(
+            parquet_file_path=sanitized_terms_tmp.name,
+            destination_table_id=args.sanitized_term_destination,
+            date=start_date,
+        )
+
+        now = datetime.now(UTC)
+        logger.info("checkpoint_9a: BigQuery export completed", extra={
             "checkpoint_delta_seconds": (now - last_checkpoint).total_seconds(),
         })
         last_checkpoint = now
@@ -198,6 +242,10 @@ def run_sanitation(args):
             failure_reason=str(e)
         )
         raise e
+    finally:
+        if parquet_writer:
+            parquet_writer.close()
+        cleanup.close()
 
     data_validation_sample = pd.concat(data_validation_sample_list, ignore_index=True)
     data_validation_sample = data_validation_sample.drop(columns=['present_in_allow_list'])
