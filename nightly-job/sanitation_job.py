@@ -164,11 +164,12 @@ def run_sanitation(args):
         sanitized_terms_tmp = cleanup.enter_context(
             tempfile.NamedTemporaryFile(suffix=f"_sanitized_terms_{start_date}.parquet")
         )
+        # needs to match https://github.com/mozilla/bigquery-etl/blob/main/sql/moz-fx-data-shared-prod/search_terms_derived/merino_log_sanitized_v3/schema.yaml
         sanitized_terms_schema = pa.schema([
             ("timestamp", pa.timestamp("us", tz="UTC")),
             ("request_id", pa.string()),
             ("session_id", pa.string()),
-            ("sequence_no", pa.string()),
+            ("sequence_no", pa.int64()),
             ("query", pa.string()),
             ("country", pa.string()),
             ("region", pa.string()),
@@ -236,7 +237,7 @@ def run_sanitation(args):
             # Cast columns that may arrive as non-string dtypes (e.g. float64 due to nulls) so that pyarrow knows how to
             # handle them
             all_terms_to_keep = all_terms_to_keep.astype({
-                "request_id": "string", "session_id": "string", "sequence_no": "string",
+                "request_id": "string", "session_id": "string", "sequence_no": "Int64",
                 "query": "string", "country": "string", "region": "string",
                 "dma": "string", "form_factor": "string", "browser": "string",
                 "os_family": "string",
