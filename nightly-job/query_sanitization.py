@@ -88,7 +88,7 @@ def filter_queries_for_sanitization(english_nlp, data: DataFrame) -> DataFrame:
     return terms_to_sanitize
 
 
-def detect_pii(series, census_surnames, nlp, n_process=1):
+def detect_pii(series, census_surnames, nlp):
     """
     Arguments:
     - series: A dataframe series of search queries as strings
@@ -164,7 +164,7 @@ def detect_pii(series, census_surnames, nlp, n_process=1):
     spaCy doc on data copying behavior per start method: https://spacy.io/usage/processing-pipelines
     Python doc on process start methods: https://docs.python.org/3/library/multiprocessing.html#contexts-and-start-methods
     '''
-    docs = nlp.pipe(texts_needing_nlp, n_process=n_process)
+    docs = nlp.pipe(texts_needing_nlp)
 
 
     query_data = zip(indices_needing_nlp, texts_needing_nlp, docs)

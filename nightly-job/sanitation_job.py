@@ -211,7 +211,7 @@ def run_sanitation(args):
                 )
             else:
                 pii_in_query_mask, run_data, language_data = detect_pii(
-                    terms_to_sanitize['query'], census_surnames, nlp, n_process=1
+                    terms_to_sanitize['query'], census_surnames, nlp
                 )
 
             now = datetime.now(UTC)
