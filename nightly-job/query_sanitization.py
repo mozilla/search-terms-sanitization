@@ -369,6 +369,7 @@ def export_search_queries_to_bigquery(parquet_file_path, destination_table_id: s
     job_config = bigquery.LoadJobConfig(
         write_disposition=bigquery.WriteDisposition.WRITE_APPEND,
         source_format=bigquery.SourceFormat.PARQUET,
+        create_disposition=bigquery.CreateDisposition.CREATE_NEVER,
     )
 
     logger.info("Loading sanitized terms into bigquery", extra={
