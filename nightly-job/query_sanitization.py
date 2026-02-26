@@ -88,7 +88,7 @@ def filter_queries_for_sanitization(english_nlp, data: DataFrame) -> DataFrame:
     return terms_to_sanitize
 
 
-def detect_pii(series, census_surnames, nlp, n_process=1):
+def detect_pii(series, census_surnames, nlp):
     """
     Arguments:
     - series: A dataframe series of search queries as strings
@@ -151,31 +151,18 @@ def detect_pii(series, census_surnames, nlp, n_process=1):
         "checkpoint_delta_seconds": 0,
     })
 
-    '''
-    The n_process arg used below specifies the number of processes for the spaCy NLP model. 
-    It allows us to parallelize the slowest part of this job across cores.
-    On Mac/OSX (which defaults to the `spawn` start setting) or CUDA (which can only use `spawn`),
-    this has bigger memory implications, as that requires a copy of the model data per core.
-    A Linux box like the one we use in prod defaults instead to the `fork` start setting,
-    which can allow a shared copy of the model data in the parent process.
-    
-    TAKEAWAY: Don't set n_process above 1 on a Mac or a GPU machine.
-    
-    spaCy doc on data copying behavior per start method: https://spacy.io/usage/processing-pipelines
-    Python doc on process start methods: https://docs.python.org/3/library/multiprocessing.html#contexts-and-start-methods
-    '''
-    docs = list(nlp.pipe(texts_needing_nlp, n_process=n_process))
+    docs = nlp.pipe(texts_needing_nlp)
 
+
+    query_data = zip(indices_needing_nlp, texts_needing_nlp, docs)
+
+    for idx, query_text, doc in query_data:
+        mutate_risk(pii_risk=pii_risk, run_data=run_data, language_data=language_data, idx=idx, query_info=(query_text, doc), census_surnames=census_surnames)
     now = datetime.now(timezone.utc)
     logger.info("checkpoint_pii_2: NLP processing completed", extra={
         "checkpoint_delta_seconds": (now - last_checkpoint).total_seconds(),
     })
     last_checkpoint = now
-
-    query_data = list(zip(indices_needing_nlp, texts_needing_nlp, docs))
-
-    for idx, query_text, doc in query_data:
-        mutate_risk(pii_risk=pii_risk, run_data=run_data, language_data=language_data, idx=idx, query_info=(query_text, doc), census_surnames=census_surnames)
     return pii_risk, run_data, language_data
 
 
