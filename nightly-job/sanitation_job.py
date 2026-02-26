@@ -57,7 +57,7 @@ def _process_chunk(chunk_series):
     Accesses nlp and census_surnames from forked process globals.
     Returns (pii_risk, run_data, language_data) — all simple types.
     """
-    return detect_pii(chunk_series, _worker_census_surnames, _worker_nlp, n_process=1)
+    return detect_pii(chunk_series, _worker_census_surnames, _worker_nlp)
 
 
 def _pooled_detect_pii(pool, n_process, series):

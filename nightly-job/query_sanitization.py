@@ -151,19 +151,6 @@ def detect_pii(series, census_surnames, nlp):
         "checkpoint_delta_seconds": 0,
     })
 
-    '''
-    The n_process arg used below specifies the number of processes for the spaCy NLP model. 
-    It allows us to parallelize the slowest part of this job across cores.
-    On Mac/OSX (which defaults to the `spawn` start setting) or CUDA (which can only use `spawn`),
-    this has bigger memory implications, as that requires a copy of the model data per core.
-    A Linux box like the one we use in prod defaults instead to the `fork` start setting,
-    which can allow a shared copy of the model data in the parent process.
-    
-    TAKEAWAY: Don't set n_process above 1 on a Mac or a GPU machine.
-    
-    spaCy doc on data copying behavior per start method: https://spacy.io/usage/processing-pipelines
-    Python doc on process start methods: https://docs.python.org/3/library/multiprocessing.html#contexts-and-start-methods
-    '''
     docs = nlp.pipe(texts_needing_nlp)
 
 
