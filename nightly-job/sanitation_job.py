@@ -37,7 +37,7 @@ parser.add_argument("--run_date", help="Date to run sanitization over. Defaults 
 parser.add_argument("--sanitized_term_destination", help="Destination table for sanitary search terms")
 parser.add_argument("--job_reporting_destination", help="Destination table for sanitation job metadata")
 parser.add_argument("--unsanitized_term_sample_destination", help="Destination table for a sample of unsanitized search terms")
-parser.add_argument("--nlp_n_process", type=int, default=None, help="Number of processes for spaCy NLP pipeline")
+parser.add_argument("--nlp_n_process", type=int, default=8, help="Number of processes for spaCy NLP pipeline")
 args = parser.parse_args()
 
 df = pd.read_csv('Names_2010Census.csv')
@@ -222,7 +222,7 @@ def run_sanitation(args):
             ("browser", pa.string()),
             ("os_family", pa.string()),
         ])
-        parquet_writer = pq.ParquetWriter(sanitized_terms_tmp.name, sanitized_terms_schema)
+        parquet_writer = pq.ParquetWriter(sanitized_terms_tmp.name, sanitized_terms_schema, compression='zstd')
 
         for idx, arrow_page in enumerate(_prefetch_iterator(unsanitized_search_term_stream)):
             raw_page = arrow_page.to_pandas()
