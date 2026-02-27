@@ -1,5 +1,7 @@
 import math
 import multiprocessing
+import queue
+import threading
 from datetime import datetime, timezone
 import argparse
 import logging
@@ -79,6 +81,34 @@ def _pooled_detect_pii(pool, n_process, series):
         for lang, count in chunk_language_data.items():
             language_data[lang] = language_data.get(lang, 0) + count
     return pii_in_query_mask, run_data, language_data
+
+
+_SENTINEL = object()
+
+
+def _prefetch_iterator(iterable):
+    """Wrap an iterator to prefetch the next item in a background thread."""
+    buf = queue.Queue(maxsize=1)
+
+    def _producer():
+        try:
+            for item in iterable:
+                buf.put(item)
+        except Exception as e:
+            buf.put(e)
+        finally:
+            buf.put(_SENTINEL)
+
+    thread = threading.Thread(target=_producer, daemon=True)
+    thread.start()
+
+    while True:
+        item = buf.get()
+        if item is _SENTINEL:
+            break
+        if isinstance(item, Exception):
+            raise item
+        yield item
 
 
 def run_sanitation(args):
@@ -180,7 +210,7 @@ def run_sanitation(args):
         ])
         parquet_writer = pq.ParquetWriter(sanitized_terms_tmp.name, sanitized_terms_schema)
 
-        for idx, raw_page in enumerate(unsanitized_search_term_stream):
+        for idx, raw_page in enumerate(_prefetch_iterator(unsanitized_search_term_stream)):
             page_start = datetime.now(UTC)
             logger.info("Sanitizing dataframe of search terms", extra={
                 "page_num": idx,
