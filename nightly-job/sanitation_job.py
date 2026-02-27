@@ -18,6 +18,8 @@ import logging_config
 import numpy
 import pandas as pd
 import spacy_fastlang
+from google.cloud.bigquery_storage import BigQueryReadClient
+
 
 import collections
 import functools
@@ -86,14 +88,17 @@ def _pooled_detect_pii(pool, n_process, series):
 _SENTINEL = object()
 
 
-def _prefetch_iterator(iterable):
+def _prefetch_iterator(iterable, batch_size=100):
     """Wrap an iterator to prefetch the next item in a background thread."""
-    buf = queue.Queue(maxsize=1)
+
+    # give enough space in the queue that we can build up a few batches
+    buf = queue.Queue(maxsize=3 * batch_size)
 
     def _producer():
         try:
             for item in iterable:
                 buf.put(item)
+                logger.info("producer inserted", extra={"queue_size": buf.qsize()})
         except Exception as e:
             buf.put(e)
         finally:
@@ -103,12 +108,20 @@ def _prefetch_iterator(iterable):
     thread.start()
 
     while True:
-        item = buf.get()
+        batch = []
+        item = None
+        # for whatever reason big query gives us back 2432 rows at a time
+        # so we batch them up to make it worth passing it off to background processes
+        while len(batch) < batch_size:
+            item = buf.get()
+            if item is _SENTINEL:
+                break
+            if isinstance(item, Exception):
+                raise item
+            batch.append(item)
+        yield pa.concat_batches(batch)
         if item is _SENTINEL:
             break
-        if isinstance(item, Exception):
-            raise item
-        yield item
 
 
 def run_sanitation(args):
@@ -163,7 +176,8 @@ def run_sanitation(args):
         })
         last_checkpoint = now
 
-        unsanitized_search_term_stream = result_row_iter.to_dataframe_iterable()
+        bqstorage_client = BigQueryReadClient()
+        unsanitized_search_term_stream = result_row_iter.to_arrow_iterable(bqstorage_client=bqstorage_client, max_stream_count=1000)
         now = datetime.now(UTC)
         logger.info("checkpoint_3: Dataframe iterable created", extra={
             "checkpoint_delta_seconds": (now - last_checkpoint).total_seconds(),
@@ -210,7 +224,8 @@ def run_sanitation(args):
         ])
         parquet_writer = pq.ParquetWriter(sanitized_terms_tmp.name, sanitized_terms_schema)
 
-        for idx, raw_page in enumerate(_prefetch_iterator(unsanitized_search_term_stream)):
+        for idx, arrow_page in enumerate(_prefetch_iterator(unsanitized_search_term_stream)):
+            raw_page = arrow_page.to_pandas()
             page_start = datetime.now(UTC)
             logger.info("Sanitizing dataframe of search terms", extra={
                 "page_num": idx,
