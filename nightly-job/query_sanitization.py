@@ -44,14 +44,15 @@ def resolve_nlp_n_process(cli_value):
 
 def load_nlp_model():
     """
-    Load the spaCy NER model with only the components needed for PII detection.
+    Load the spaCy NER model with only the NER component active.
 
     This function should be used in production model load AND tests for consistency.
-    Only includes: tok2vec (required for NER) and ner (for PERSON detection).
-    Excludes: tagger, parser, attribute_ruler, lemmatizer.
+    Disables tok2vec so the pipeline runs NER only, using the model's static word
+    vectors instead of contextual embeddings. This is faster than running tok2vec.
+    Also disables: tagger, parser, attribute_ruler, lemmatizer.
 
     """
-    return spacy.load("en_core_web_lg", exclude=["tagger", "parser", "attribute_ruler", "lemmatizer"])
+    return spacy.load("en_core_web_lg", disable=["tok2vec", "tagger", "parser", "attribute_ruler", "lemmatizer"])
 
 
 def load_english_detection_model():
