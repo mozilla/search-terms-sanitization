@@ -47,12 +47,12 @@ def load_nlp_model():
     Load the spaCy NER model with only the NER component active.
 
     This function should be used in production model load AND tests for consistency.
-    Disables tok2vec so the pipeline runs NER only, using the model's static word
+    Excludes tok2vec so the pipeline runs NER only, using the model's static word
     vectors instead of contextual embeddings. This is faster than running tok2vec.
-    Also disables: tagger, parser, attribute_ruler, lemmatizer.
+    Also excludes: tagger, parser, attribute_ruler, lemmatizer.
 
     """
-    return spacy.load("en_core_web_lg", disable=["tok2vec", "tagger", "parser", "attribute_ruler", "lemmatizer"])
+    return spacy.load("en_core_web_lg", exclude=["tok2vec", "tagger", "parser", "attribute_ruler", "lemmatizer"])
 
 
 def load_english_detection_model():
