@@ -8,14 +8,19 @@ Each configuration runs in a fresh subprocess so peak RSS reflects only that
 configuration's footprint. resource.getrusage() reports the OS-tracked peak,
 which is reliable regardless of Python's allocator behaviour.
 
+Most recently used to benchmark several config options for spaCy NER:
   d   = disable tok2vec + tagger + parser + attribute_ruler + lemmatizer
   d+e = disable tok2vec, exclude tagger + parser + attribute_ruler + lemmatizer
   e   = exclude tok2vec + tagger + parser + attribute_ruler + lemmatizer
 
-Results are written to benchmark_results.csv.
+Results are written to benchmark_detect_pii_per_frame.csv.
 
-Usage (from nightly-job/):
-    python benchmark_frame.py
+Usage:
+
+1. Update FRAME_SIZE for the size of dataframe you want to test on
+2. Update RUNS for the number of runs you want to do (to confirm consistent results)
+3. Update CONFIGS to whatever different versions of detect_pii you want to compare
+4. $python benchmarks/benchmark_detect_pii_per_frame.py
 """
 
 import csv
@@ -30,10 +35,8 @@ import pandas as pd
 
 FRAME_SIZE = 10_000  # rows per simulated BigQuery page
 RUNS = 10
-OUTPUT_CSV = Path(__file__).parent / "benchmark_results.csv"
-
-TEST_DATA_PATH = Path(__file__).parent / "test_data" / "ner_integration_test_data.csv"
-CENSUS_PATH = Path(__file__).parent / "Names_2010Census.csv"
+TEST_DATA_PATH = Path(__file__).parent.parent / "tests" / "test_data" / "ner_integration_test_data.csv"
+CENSUS_PATH = Path(__file__).parent.parent / "Names_2010Census.csv"
 
 CONFIGS = [
     (
@@ -52,6 +55,7 @@ CONFIGS = [
         {"exclude": ["tok2vec", "tagger", "parser", "attribute_ruler", "lemmatizer"]},
     ),
 ]
+OUTPUT_CSV = Path(__file__).parent / "benchmark_detect_pii_per_frame.csv"
 
 _WORKER_FLAG = "--_worker"
 
@@ -63,9 +67,25 @@ def build_frame(size: int) -> pd.Series:
 
 def _worker(config_json: str) -> None:
     """Entry point for subprocess workers. Prints a JSON result line."""
+    import logging
     import spacy
     import spacy_fastlang  # noqa: F401
     from query_sanitization import detect_pii
+
+    _STANDARD_LOG_ATTRS = frozenset(logging.LogRecord("", 0, "", 0, "", (), None).__dict__)
+
+    class _ExtraFormatter(logging.Formatter):
+        def format(self, record):
+            base = super().format(record)
+            extras = {k: v for k, v in record.__dict__.items() if k not in _STANDARD_LOG_ATTRS}
+            if extras:
+                return base + " | " + " ".join(f"{k}={v}" for k, v in extras.items())
+            return base
+
+    handler = logging.StreamHandler()
+    handler.setFormatter(_ExtraFormatter())
+    logging.getLogger().addHandler(handler)
+    logging.getLogger().setLevel(logging.INFO)
 
     config = json.loads(config_json)
     census_df = pd.read_csv(CENSUS_PATH)
@@ -99,11 +119,11 @@ def _run_config(label: str, kwargs: dict) -> dict:
     """Spawn a fresh subprocess for one config and return its JSON result."""
     proc = subprocess.run(
         [sys.executable, __file__, _WORKER_FLAG, json.dumps(kwargs)],
-        capture_output=True,
+        stdout=subprocess.PIPE,
         text=True,
     )
     if proc.returncode != 0:
-        print(f"\nERROR in config '{label}':\n{proc.stderr}", file=sys.stderr)
+        print(f"\nERROR in config '{label}' (see stderr above)", file=sys.stderr)
         sys.exit(1)
     lines = [l for l in proc.stdout.splitlines() if l.strip()]
     r = json.loads(lines[-1])
