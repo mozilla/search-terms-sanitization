@@ -120,10 +120,6 @@ def detect_pii(series, census_surnames, nlp):
     series.fillna("FX_RECEIVED_EMPTY_QUERY", inplace=True)
     texts = list(series)
 
-    logger.info("checkpoint_pii_1: Starting filter for numbers and @", extra={
-        "checkpoint_delta_seconds": 0,
-    })
-
     indices_needing_nlp = []
     texts_needing_nlp = []
 
@@ -141,16 +137,12 @@ def detect_pii(series, census_surnames, nlp):
         texts_needing_nlp.append(query_str)
 
     now = datetime.now(timezone.utc)
-    logger.info("checkpoint_pii_1a: Quick filter completed", extra={
+    logger.info("checkpoint_pii_1: Completed Quick Filters (numerals and @)", extra={
         "checkpoint_delta_seconds": (now - last_checkpoint).total_seconds(),
         "queries_needing_nlp": len(texts_needing_nlp),
         "queries_rejected_early": len(texts) - len(texts_needing_nlp),
     })
     last_checkpoint = now
-
-    logger.info("checkpoint_pii_1b: Starting NLP processing", extra={
-        "checkpoint_delta_seconds": 0,
-    })
 
     docs = nlp.pipe(texts_needing_nlp)
 
@@ -160,7 +152,7 @@ def detect_pii(series, census_surnames, nlp):
     for idx, query_text, doc in query_data:
         mutate_risk(pii_risk=pii_risk, run_data=run_data, language_data=language_data, idx=idx, query_info=(query_text, doc), census_surnames=census_surnames)
     now = datetime.now(timezone.utc)
-    logger.info("checkpoint_pii_2: NLP processing completed", extra={
+    logger.info("checkpoint_pii_2: Completed NLP Processing (named entity recognition)", extra={
         "checkpoint_delta_seconds": (now - last_checkpoint).total_seconds(),
     })
     last_checkpoint = now
