@@ -89,7 +89,12 @@ _SENTINEL = object()
 
 
 def _prefetch_iterator(iterable, batch_size=100):
-    """Wrap an iterator to prefetch the next item in a background thread."""
+    """
+    Wrap an iterator to prefetch the next item in a background thread.
+
+    batch_size: refers to the number of pages that we get back from BQ. As far as I can tell the size of the page is set
+    by the server and I was seeing 2432 rows testing locally.
+    """
 
     # give enough space in the queue that we can build up a few batches
     buf = queue.Queue(maxsize=3 * batch_size)
