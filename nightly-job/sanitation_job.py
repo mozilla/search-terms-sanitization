@@ -38,7 +38,6 @@ parser.add_argument("--sanitized_term_destination", help="Destination table for 
 parser.add_argument("--job_reporting_destination", help="Destination table for sanitation job metadata")
 parser.add_argument("--unsanitized_term_sample_destination", help="Destination table for a sample of unsanitized search terms")
 parser.add_argument("--nlp_n_process", type=int, default=None, help="Number of processes for spaCy NLP pipeline")
-args = parser.parse_args()
 
 df = pd.read_csv('Names_2010Census.csv')
 census_surnames = set(str(name).lower() for name in df.name)
@@ -124,7 +123,8 @@ def _prefetch_iterator(iterable, batch_size=100):
             if isinstance(item, Exception):
                 raise item
             batch.append(item)
-        yield pa.concat_batches(batch)
+        if batch:
+            yield pa.concat_batches(batch)
         if item is _SENTINEL:
             break
 
@@ -381,4 +381,5 @@ def run_sanitation(args):
     })
 
 if __name__ == "__main__":
+    args = parser.parse_args()
     run_sanitation(args=args)
