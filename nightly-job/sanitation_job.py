@@ -124,7 +124,8 @@ def _prefetch_iterator(iterable, batch_size=100):
             if isinstance(item, Exception):
                 raise item
             batch.append(item)
-        yield pa.concat_batches(batch)
+        if batch:
+            yield pa.concat_batches(batch)
         if item is _SENTINEL:
             break
 
