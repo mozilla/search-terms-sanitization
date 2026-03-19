@@ -310,46 +310,46 @@ def run_sanitation(args):
                 })
                 last_checkpoint = now
 
-            parquet_writer.close()
+        parquet_writer.close()
 
-            now = datetime.now(UTC)
-            logger.info("checkpoint_9: All pages processed, starting BigQuery export", extra={
-                "checkpoint_delta_seconds": (now - last_checkpoint).total_seconds(),
-            })
-            last_checkpoint = now
+        now = datetime.now(UTC)
+        logger.info("checkpoint_9: All pages processed, starting BigQuery export", extra={
+            "checkpoint_delta_seconds": (now - last_checkpoint).total_seconds(),
+        })
+        last_checkpoint = now
 
-            export_search_queries_to_bigquery(
-                parquet_file_path=sanitized_terms_tmp.name,
-                destination_table_id=args.sanitized_term_destination,
-                date=start_date,
-            )
+        export_search_queries_to_bigquery(
+            parquet_file_path=sanitized_terms_tmp.name,
+            destination_table_id=args.sanitized_term_destination,
+            date=start_date,
+        )
 
-            now = datetime.now(UTC)
-            logger.info("checkpoint_9a: BigQuery export completed", extra={
-                "checkpoint_delta_seconds": (now - last_checkpoint).total_seconds(),
-            })
-            last_checkpoint = now
+        now = datetime.now(UTC)
+        logger.info("checkpoint_9a: BigQuery export completed", extra={
+            "checkpoint_delta_seconds": (now - last_checkpoint).total_seconds(),
+        })
+        last_checkpoint = now
 
-            record_job_metadata(
-                status='SUCCESS',
-                started_at=start_time,
-                ended_at=datetime.now(UTC),
-                destination_table_id=args.job_reporting_destination,
-                total_run=total_run,
-                total_allow_listed=total_allow_listed,
-                total_rejected=total_run - (total_allow_listed + total_cleared_in_sanitation),
-                run_data=summary_run_data,
-                language_data=summary_language_data,
-                implementation_notes="Run with a page_size of UNLIMITED from script",
-                total_terms_inclusive=total_terms,
-                total_blank=total_blank
-            )
+        record_job_metadata(
+            status='SUCCESS',
+            started_at=start_time,
+            ended_at=datetime.now(UTC),
+            destination_table_id=args.job_reporting_destination,
+            total_run=total_run,
+            total_allow_listed=total_allow_listed,
+            total_rejected=total_run - (total_allow_listed + total_cleared_in_sanitation),
+            run_data=summary_run_data,
+            language_data=summary_language_data,
+            implementation_notes="Run with a page_size of UNLIMITED from script",
+            total_terms_inclusive=total_terms,
+            total_blank=total_blank
+        )
 
-            now = datetime.now(UTC)
-            logger.info("checkpoint_10: Job metadata recorded", extra={
-                "checkpoint_delta_seconds": (now - last_checkpoint).total_seconds(),
-            })
-            last_checkpoint = now
+        now = datetime.now(UTC)
+        logger.info("checkpoint_10: Job metadata recorded", extra={
+            "checkpoint_delta_seconds": (now - last_checkpoint).total_seconds(),
+        })
+        last_checkpoint = now
 
     except Exception as e:
         record_job_metadata(
