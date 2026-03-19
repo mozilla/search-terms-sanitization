@@ -85,7 +85,7 @@ def _pooled_detect_pii(pool, n_process, series):
 
 
 _SENTINEL = object()
-
+TEN_MINUTES = 60 * 10
 
 def _prefetch_iterator(iterable, batch_size=100):
     """
@@ -117,7 +117,7 @@ def _prefetch_iterator(iterable, batch_size=100):
         # for whatever reason big query gives us back 2432 rows at a time
         # so we batch them up to make it worth passing it off to background processes
         while len(batch) < batch_size:
-            item = buf.get()
+            item = buf.get(timeout=TEN_MINUTES)
             if item is _SENTINEL:
                 break
             if isinstance(item, Exception):
@@ -171,18 +171,14 @@ def run_sanitation(args):
         })
         last_checkpoint = now
 
-        result_row_iter = stream_search_terms(start_date=start_date, end_date=end_date) # load unsanitized search terms
-        logger.info("Fetched rows from bigquery", extra={
-            "total_rows": result_row_iter.total_rows,
-        })
+        result_row_iter_generator = stream_search_terms(start_date=start_date, end_date=end_date) # load unsanitized search terms
         now = datetime.now(UTC)
         logger.info("checkpoint_2: Stream search terms query completed", extra={
             "checkpoint_delta_seconds": (now - last_checkpoint).total_seconds(),
         })
         last_checkpoint = now
 
-        bqstorage_client = BigQueryReadClient()
-        unsanitized_search_term_stream = result_row_iter.to_arrow_iterable(bqstorage_client=bqstorage_client, max_stream_count=1000)
+
         now = datetime.now(UTC)
         logger.info("checkpoint_3: Dataframe iterable created", extra={
             "checkpoint_delta_seconds": (now - last_checkpoint).total_seconds(),
@@ -228,85 +224,91 @@ def run_sanitation(args):
             ("os_family", pa.string()),
         ])
         parquet_writer = pq.ParquetWriter(sanitized_terms_tmp.name, sanitized_terms_schema, compression='zstd')
-
-        for idx, arrow_page in enumerate(_prefetch_iterator(unsanitized_search_term_stream)):
-            raw_page = arrow_page.to_pandas()
-            page_start = datetime.now(UTC)
-            logger.info("Sanitizing dataframe of search terms", extra={
-                "page_num": idx,
-                "page_size": raw_page.shape[0],
+        bqstorage_client = BigQueryReadClient()
+        for page_number, page in enumerate(result_row_iter_generator):
+            logger.info("Fetched a page of rows from bigquery", extra={
+                "total_rows": page.total_rows,
+                "page_number": page_number,
             })
-            logger.info("checkpoint_4: Page received from iterator", extra={
-                "checkpoint_delta_seconds": (page_start - last_checkpoint).total_seconds(),
-            })
-            last_checkpoint = page_start
+            unsanitized_search_term_stream = page.to_arrow_iterable(bqstorage_client=bqstorage_client, max_stream_count=1000)
+            for idx, arrow_page in enumerate(_prefetch_iterator(unsanitized_search_term_stream)):
+                raw_page = arrow_page.to_pandas()
+                page_start = datetime.now(UTC)
+                logger.info("Sanitizing dataframe of search terms", extra={
+                    "page_num": idx,
+                    "page_size": raw_page.shape[0],
+                })
+                logger.info("checkpoint_4: Page received from iterator", extra={
+                    "checkpoint_delta_seconds": (page_start - last_checkpoint).total_seconds(),
+                })
+                last_checkpoint = page_start
 
-            total_run += raw_page.shape[0]
+                total_run += raw_page.shape[0]
 
-            one_percent_sample = raw_page.sample(frac = 0.01)
-            data_validation_sample_list.append(one_percent_sample)
+                one_percent_sample = raw_page.sample(frac = 0.01)
+                data_validation_sample_list.append(one_percent_sample)
 
-            allow_listed_terms_page = raw_page.loc[raw_page.present_in_allow_list]
+                allow_listed_terms_page = raw_page.loc[raw_page.present_in_allow_list]
 
-            terms_to_sanitize = filter_queries_for_sanitization(english_nlp, raw_page.loc[~raw_page.present_in_allow_list])
+                terms_to_sanitize = filter_queries_for_sanitization(english_nlp, raw_page.loc[~raw_page.present_in_allow_list])
 
-            now = datetime.now(UTC)
-            logger.info("checkpoint_5: Dataframe filtering completed", extra={
-                "checkpoint_delta_seconds": (now - last_checkpoint).total_seconds(),
-            })
-            last_checkpoint = now
+                now = datetime.now(UTC)
+                logger.info("checkpoint_5: Dataframe filtering completed", extra={
+                    "checkpoint_delta_seconds": (now - last_checkpoint).total_seconds(),
+                })
+                last_checkpoint = now
 
-            if pool is not None:
-                pii_in_query_mask, run_data, language_data = _pooled_detect_pii(
-                    pool, n_process, terms_to_sanitize['query']
-                )
-            else:
-                pii_in_query_mask, run_data, language_data = detect_pii(
-                    terms_to_sanitize['query'], census_surnames, nlp
-                )
+                if pool is not None:
+                    pii_in_query_mask, run_data, language_data = _pooled_detect_pii(
+                        pool, n_process, terms_to_sanitize['query']
+                    )
+                else:
+                    pii_in_query_mask, run_data, language_data = detect_pii(
+                        terms_to_sanitize['query'], census_surnames, nlp
+                    )
 
-            now = datetime.now(UTC)
-            logger.info("checkpoint_6: PII detection completed", extra={
-                "checkpoint_delta_seconds": (now - last_checkpoint).total_seconds(),
-            })
-            last_checkpoint = now
-            # ~ reverses the mask so we get the queries WITHOUT PII in them
-            sanitized_page = terms_to_sanitize.loc[~numpy.array(pii_in_query_mask)]
+                now = datetime.now(UTC)
+                logger.info("checkpoint_6: PII detection completed", extra={
+                    "checkpoint_delta_seconds": (now - last_checkpoint).total_seconds(),
+                })
+                last_checkpoint = now
+                # ~ reverses the mask so we get the queries WITHOUT PII in them
+                sanitized_page = terms_to_sanitize.loc[~numpy.array(pii_in_query_mask)]
 
-            total_allow_listed += allow_listed_terms_page.shape[0]
-            total_cleared_in_sanitation += sanitized_page.shape[0]
+                total_allow_listed += allow_listed_terms_page.shape[0]
+                total_cleared_in_sanitation += sanitized_page.shape[0]
 
-            summary_language_data = dict(functools.reduce(operator.add,
-                            map(collections.Counter, [summary_language_data, language_data])))
-            summary_run_data = dict(functools.reduce(operator.add,
-                            map(collections.Counter, [summary_run_data, run_data])))
+                summary_language_data = dict(functools.reduce(operator.add,
+                                map(collections.Counter, [summary_language_data, language_data])))
+                summary_run_data = dict(functools.reduce(operator.add,
+                                map(collections.Counter, [summary_run_data, run_data])))
 
-            all_terms_to_keep = pd.concat([allow_listed_terms_page, sanitized_page])
-            all_terms_to_keep = all_terms_to_keep.drop(columns=['present_in_allow_list'])
+                all_terms_to_keep = pd.concat([allow_listed_terms_page, sanitized_page])
+                all_terms_to_keep = all_terms_to_keep.drop(columns=['present_in_allow_list'])
 
-            # Cast columns that may arrive as non-string dtypes (e.g. float64 due to nulls) so that pyarrow knows how to
-            # handle them
-            all_terms_to_keep = all_terms_to_keep.astype({
-                "request_id": "string", "session_id": "string", "sequence_no": "Int64",
-                "query": "string", "country": "string", "region": "string",
-                "dma": "string", "form_factor": "string", "browser": "string",
-                "os_family": "string",
-            })
+                # Cast columns that may arrive as non-string dtypes (e.g. float64 due to nulls) so that pyarrow knows how to
+                # handle them
+                all_terms_to_keep = all_terms_to_keep.astype({
+                    "request_id": "string", "session_id": "string", "sequence_no": "Int64",
+                    "query": "string", "country": "string", "region": "string",
+                    "dma": "string", "form_factor": "string", "browser": "string",
+                    "os_family": "string",
+                })
 
-            now = datetime.now(UTC)
-            logger.info("checkpoint_7: Data preparation for write done", extra={
-                "checkpoint_delta_seconds": (now - last_checkpoint).total_seconds(),
-            })
-            last_checkpoint = now
+                now = datetime.now(UTC)
+                logger.info("checkpoint_7: Data preparation for write done", extra={
+                    "checkpoint_delta_seconds": (now - last_checkpoint).total_seconds(),
+                })
+                last_checkpoint = now
 
-            parquet_writer.write_table(pa.Table.from_pandas(all_terms_to_keep, schema=sanitized_terms_schema))
+                parquet_writer.write_table(pa.Table.from_pandas(all_terms_to_keep, schema=sanitized_terms_schema))
 
-            now = datetime.now(UTC)
-            logger.info("checkpoint_8: Page written to local parquet", extra={
-                "checkpoint_delta_seconds": (now - last_checkpoint).total_seconds(),
-                "parquet_file_size_mb": round(os.path.getsize(sanitized_terms_tmp.name) / (1024 * 1024), 2),
-            })
-            last_checkpoint = now
+                now = datetime.now(UTC)
+                logger.info("checkpoint_8: Page written to local parquet", extra={
+                    "checkpoint_delta_seconds": (now - last_checkpoint).total_seconds(),
+                    "parquet_file_size_mb": round(os.path.getsize(sanitized_terms_tmp.name) / (1024 * 1024), 2),
+                })
+                last_checkpoint = now
 
         parquet_writer.close()
 
