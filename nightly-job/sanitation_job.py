@@ -1,4 +1,3 @@
-import itertools
 import math
 import multiprocessing
 import queue
@@ -86,7 +85,7 @@ def _pooled_detect_pii(pool, n_process, series):
 
 
 _SENTINEL = object()
-
+TEN_MINUTES = 60 * 10
 
 def _prefetch_iterator(iterable, batch_size=100):
     """
@@ -118,7 +117,7 @@ def _prefetch_iterator(iterable, batch_size=100):
         # for whatever reason big query gives us back 2432 rows at a time
         # so we batch them up to make it worth passing it off to background processes
         while len(batch) < batch_size:
-            item = buf.get(timeout=60*10)
+            item = buf.get(timeout=TEN_MINUTES)
             if item is _SENTINEL:
                 break
             if isinstance(item, Exception):
@@ -226,9 +225,10 @@ def run_sanitation(args):
         ])
         parquet_writer = pq.ParquetWriter(sanitized_terms_tmp.name, sanitized_terms_schema, compression='zstd')
         bqstorage_client = BigQueryReadClient()
-        for page in result_row_iter_generator:
-            logger.info("Fetched rows from bigquery", extra={
+        for page_number, page in enumerate(result_row_iter_generator):
+            logger.info("Fetched a page of rows from bigquery", extra={
                 "total_rows": page.total_rows,
+                "page_number": page_number,
             })
             unsanitized_search_term_stream = page.to_arrow_iterable(bqstorage_client=bqstorage_client, max_stream_count=1000)
             for idx, arrow_page in enumerate(_prefetch_iterator(unsanitized_search_term_stream)):
