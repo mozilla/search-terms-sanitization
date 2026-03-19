@@ -246,13 +246,15 @@ WHERE
     jsonPayload.type = "web.suggest.request"
     -- Trim empty queries
     AND TRIM(search_logs.jsonPayload.fields.query) != ""
-    --Specifically get the previous day's data
+    --Specifically get the previous day's data with a limit
     AND DATE(timestamp) >= @start_date
     AND DATE(timestamp) < @end_date
+    LIMIT @limit
+    OFFSET @offset
 """
 
 
-def stream_search_terms(start_date: str, end_date: str) -> table.RowIterator: 
+def stream_search_terms(start_date: str, end_date: str) -> table.RowIterator:
     """
     Pull the full 2-day dataset of unsanitized search queries stored on BigQuery.
     
@@ -260,15 +262,24 @@ def stream_search_terms(start_date: str, end_date: str) -> table.RowIterator:
     
     Returns: A dataframe of the unsanitized search queries.
     """
-    client = bigquery.Client()
-    job_config = bigquery.QueryJobConfig(
-        query_parameters=[
-            bigquery.ScalarQueryParameter("start_date", "STRING", start_date),
-            bigquery.ScalarQueryParameter("end_date", "STRING", end_date),
-       ]
-    )
-    query_job = client.query(UNSANITIZED_QUERIES_FOR_ANALYSIS_SQL, job_config=job_config)
-    return query_job.result()
+    limit = 10_000_000
+    offset = 0
+    while True:
+        client = bigquery.Client()
+        job_config = bigquery.QueryJobConfig(
+            query_parameters=[
+                bigquery.ScalarQueryParameter("start_date", "STRING", start_date),
+                bigquery.ScalarQueryParameter("end_date", "STRING", end_date),
+                bigquery.ScalarQueryParameter("limit", "INTEGER", limit),
+                bigquery.ScalarQueryParameter("offset", "INTEGER", offset),
+           ]
+        )
+        query_job = client.query(UNSANITIZED_QUERIES_FOR_ANALYSIS_SQL, job_config=job_config)
+        job_result = query_job.result()
+        if job_result.total_rows == 0:
+            return
+        yield job_result
+        offset += limit
 
 
 UNSANITIZED_QUERY_STATS = """
