@@ -7,7 +7,7 @@ db-dtypes==1.2.0
 dockerflow==2024.4.1
 google-cloud-bigquery-storage==2.36.2
 
-pytest==8.1.1
+pytest==9.0.3
 
 # https://spacy.io/usage/models#models-download
 # https://spacy.io/models/en#en_core_web_lg
