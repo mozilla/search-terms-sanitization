@@ -45,6 +45,18 @@ census_surnames = set(str(name).lower() for name in df.name)
 _worker_nlp = None
 _worker_census_surnames = None
 
+class CheckPointer:
+    """Class for helping us measure the time between parts of the job."""
+
+    def __init__(self):
+        self.last_checkpoint = datetime.now(UTC)
+
+    def __call__(self, message: str, **extra):
+        now = datetime.now(UTC)
+        extra["checkpoint_delta_seconds"] = (now - self.last_checkpoint).total_seconds()
+        logger.info(message, extra=extra)
+        self.last_checkpoint = now
+
 
 def _init_worker(census_surnames):
     """Each worker loads the model after forking instead of trying to load once and pass without copying."""
@@ -131,7 +143,7 @@ def _prefetch_iterator(iterable, batch_size=100):
 
 def run_sanitation(args):
     start_time = datetime.now(UTC)
-    last_checkpoint = start_time
+    checkpoint = CheckPointer()
 
     # stats before analysis
     total_terms = 0
@@ -150,9 +162,7 @@ def run_sanitation(args):
         "end_date": end_date,
         "n_nlp_processes": n_process,
     })
-    logger.info("checkpoint_0: Job initialized", extra={
-        "checkpoint_delta_seconds": 0,
-    })
+    checkpoint("checkpoint_0: Job initialized")
 
     data_validation_sample_list = []
     # use exit stack to avoid extra nesting from with blocks
@@ -165,33 +175,17 @@ def run_sanitation(args):
         initial_stats = get_initial_term_stats(start_date=start_date, end_date=end_date)
         total_terms = initial_stats.loc[0].total_term_count
         total_blank = initial_stats.loc[0].total_blank_count
-        now = datetime.now(UTC)
-        logger.info("checkpoint_1: Initial stats query completed", extra={
-            "checkpoint_delta_seconds": (now - last_checkpoint).total_seconds(),
-        })
-        last_checkpoint = now
+        checkpoint("checkpoint_1: Initial stats query completed")
 
         result_row_iter_generator = stream_search_terms(start_date=start_date, end_date=end_date) # load unsanitized search terms
-        now = datetime.now(UTC)
-        logger.info("checkpoint_2: Stream search terms query completed", extra={
-            "checkpoint_delta_seconds": (now - last_checkpoint).total_seconds(),
-        })
-        last_checkpoint = now
+        checkpoint("checkpoint_2: Stream search terms query completed")
 
 
-        now = datetime.now(UTC)
-        logger.info("checkpoint_3: Dataframe iterable created", extra={
-            "checkpoint_delta_seconds": (now - last_checkpoint).total_seconds(),
-        })
-        last_checkpoint = now
+        checkpoint("checkpoint_3: Dataframe iterable created")
 
         english_nlp = load_english_detection_model()
 
-        now = datetime.now(UTC)
-        logger.info("checkpoint_3a: spaCy model loaded", extra={
-            "checkpoint_delta_seconds": (now - last_checkpoint).total_seconds(),
-        })
-        last_checkpoint = now
+        checkpoint("checkpoint_3a: spaCy model loaded")
 
         if n_process > 1:
             pool = multiprocessing.Pool(
@@ -233,15 +227,11 @@ def run_sanitation(args):
             unsanitized_search_term_stream = page.to_arrow_iterable(bqstorage_client=bqstorage_client, max_stream_count=1000)
             for idx, arrow_page in enumerate(_prefetch_iterator(unsanitized_search_term_stream)):
                 raw_page = arrow_page.to_pandas()
-                page_start = datetime.now(UTC)
                 logger.info("Sanitizing dataframe of search terms", extra={
                     "page_num": idx,
                     "page_size": raw_page.shape[0],
                 })
-                logger.info("checkpoint_4: Page received from iterator", extra={
-                    "checkpoint_delta_seconds": (page_start - last_checkpoint).total_seconds(),
-                })
-                last_checkpoint = page_start
+                checkpoint("checkpoint_4: Page received from iterator")
 
                 total_run += raw_page.shape[0]
 
@@ -252,11 +242,7 @@ def run_sanitation(args):
 
                 terms_to_sanitize = filter_queries_for_sanitization(english_nlp, raw_page.loc[~raw_page.present_in_allow_list])
 
-                now = datetime.now(UTC)
-                logger.info("checkpoint_5: Dataframe filtering completed", extra={
-                    "checkpoint_delta_seconds": (now - last_checkpoint).total_seconds(),
-                })
-                last_checkpoint = now
+                checkpoint("checkpoint_5: Dataframe filtering completed")
 
                 if pool is not None:
                     pii_in_query_mask, run_data, language_data = _pooled_detect_pii(
@@ -267,11 +253,7 @@ def run_sanitation(args):
                         terms_to_sanitize['query'], census_surnames, nlp
                     )
 
-                now = datetime.now(UTC)
-                logger.info("checkpoint_6: PII detection completed", extra={
-                    "checkpoint_delta_seconds": (now - last_checkpoint).total_seconds(),
-                })
-                last_checkpoint = now
+                checkpoint("checkpoint_6: PII detection completed")
                 # ~ reverses the mask so we get the queries WITHOUT PII in them
                 sanitized_page = terms_to_sanitize.loc[~numpy.array(pii_in_query_mask)]
 
@@ -295,28 +277,18 @@ def run_sanitation(args):
                     "os_family": "string",
                 })
 
-                now = datetime.now(UTC)
-                logger.info("checkpoint_7: Data preparation for write done", extra={
-                    "checkpoint_delta_seconds": (now - last_checkpoint).total_seconds(),
-                })
-                last_checkpoint = now
+                checkpoint("checkpoint_7: Data preparation for write done")
 
                 parquet_writer.write_table(pa.Table.from_pandas(all_terms_to_keep, schema=sanitized_terms_schema))
 
-                now = datetime.now(UTC)
-                logger.info("checkpoint_8: Page written to local parquet", extra={
-                    "checkpoint_delta_seconds": (now - last_checkpoint).total_seconds(),
-                    "parquet_file_size_mb": round(os.path.getsize(sanitized_terms_tmp.name) / (1024 * 1024), 2),
-                })
-                last_checkpoint = now
+                checkpoint(
+                    "checkpoint_8: Page written to local parquet",
+                    parquet_file_size_mb=round(os.path.getsize(sanitized_terms_tmp.name) / (1024 * 1024), 2),
+                )
 
         parquet_writer.close()
 
-        now = datetime.now(UTC)
-        logger.info("checkpoint_9: All pages processed, starting BigQuery export", extra={
-            "checkpoint_delta_seconds": (now - last_checkpoint).total_seconds(),
-        })
-        last_checkpoint = now
+        checkpoint("checkpoint_9: All pages processed, starting BigQuery export")
 
         export_search_queries_to_bigquery(
             parquet_file_path=sanitized_terms_tmp.name,
@@ -324,11 +296,7 @@ def run_sanitation(args):
             date=start_date,
         )
 
-        now = datetime.now(UTC)
-        logger.info("checkpoint_9a: BigQuery export completed", extra={
-            "checkpoint_delta_seconds": (now - last_checkpoint).total_seconds(),
-        })
-        last_checkpoint = now
+        checkpoint("checkpoint_9a: BigQuery export completed")
 
         record_job_metadata(
             status='SUCCESS',
@@ -345,11 +313,7 @@ def run_sanitation(args):
             total_blank=total_blank
         )
 
-        now = datetime.now(UTC)
-        logger.info("checkpoint_10: Job metadata recorded", extra={
-            "checkpoint_delta_seconds": (now - last_checkpoint).total_seconds(),
-        })
-        last_checkpoint = now
+        checkpoint("checkpoint_10: Job metadata recorded")
 
     except Exception as e:
         record_job_metadata(
@@ -368,19 +332,12 @@ def run_sanitation(args):
     data_validation_sample = pd.concat(data_validation_sample_list, ignore_index=True)
     data_validation_sample = data_validation_sample.drop(columns=['present_in_allow_list'])
 
-    now = datetime.now(UTC)
-    logger.info("checkpoint_11: Starting validation sample export", extra={
-        "checkpoint_delta_seconds": (now - last_checkpoint).total_seconds(),
-    })
-    last_checkpoint = now
+    checkpoint("checkpoint_11: Starting validation sample export")
 
     export_sample_to_bigquery(dataframe=data_validation_sample, sample_table_id=args.unsanitized_term_sample_destination, date=start_date)
     logger.info("Sanitation job complete!")
 
-    now = datetime.now(UTC)
-    logger.info("checkpoint_12: Job complete", extra={
-        "checkpoint_delta_seconds": (now - last_checkpoint).total_seconds(),
-    })
+    checkpoint("checkpoint_12: Job complete")
 
 if __name__ == "__main__":
     args = parser.parse_args()
