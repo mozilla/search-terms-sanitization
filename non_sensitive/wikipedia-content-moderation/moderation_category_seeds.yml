@@ -20,6 +20,7 @@ blocklist:
     ignore_re:
       # Pulls in non-objectionable topics about a culture
       - \beskimo
+    max_level: 4
 
   # Cruelty & torture
   - topic: cruelty
@@ -35,7 +36,7 @@ blocklist:
       # Relates to religion
       - Crucifixion
       # Relates to sports, medical/prosthetics, etc
-      - Amputations
+      - Amputation
       # Fiction
       - Fictional torturers
       - Works about torture
@@ -47,6 +48,8 @@ blocklist:
       - \banti-torture\b
       - \btorture victims?\b
       - \bhuman rights activ
+    # Search cut off: this topic does not self-limit (351,672 categories uncapped).
+    max_level: 4
 
   # Child abuse
   - topic: child_abuse
@@ -125,6 +128,8 @@ blocklist:
     seed_categories:
       # White nationalism, nazism, fascism, alt-right, symbols, people, events
       - White nationalism
+      # Religious extremism, fundamentalism & terrorism across religions
+      - Religious fanaticism
     ignore_categories:
       - Works about apartheid
     # Search cut off after level 4 to avoid branching into more general topics, eg. US civil war

@@ -22,13 +22,22 @@ LATEST_DUMP_DATE_URL = (
 )
 CATEGORY_RDF_URL_TEMPLATE = "https://dumps.wikimedia.org/other/categoriesrdf/{date}/enwiki-{date}-categories.ttl.gz"
 
+# Wikimedia rejects requests sending a generic library User-Agent with a 403.
+# https://foundation.wikimedia.org/wiki/Policy:User-Agent_policy
+REQUEST_HEADERS = {
+    "User-Agent": (
+        "search-terms-sanitization/1.0 "
+        "(https://github.com/mozilla/search-terms-sanitization)"
+    )
+}
+
 
 def get_latest_category_dump_date():
     """Pull the date of the latest dump from Wikimedia dumps.
 
     Returns a string in yyyymmdd format.
     """
-    r = requests.get(LATEST_DUMP_DATE_URL)
+    r = requests.get(LATEST_DUMP_DATE_URL, headers=REQUEST_HEADERS)
     r.raise_for_status()
     return r.text[:8]
 
@@ -43,7 +52,7 @@ def fetch_category_index(date, data_dir):
     """
     url = CATEGORY_RDF_URL_TEMPLATE.format(date=date)
     dest_file = Path(data_dir) / CATEGORY_RDF_FILE
-    with requests.get(url, stream=True) as r:
+    with requests.get(url, stream=True, headers=REQUEST_HEADERS) as r:
         r.raise_for_status()
         with open(dest_file, "wb") as f:
             for chunk in r.iter_content(chunk_size=1024 * 1024):
@@ -591,7 +600,7 @@ def style_diff(diff_df):
     """
 
     def diff_style(r):
-        styles = pd.Series(None, index=r.index)
+        styles = pd.Series(None, index=r.index, dtype="object")
         if r["seed_previous"] == "--":
             for x in ["name", "seed_new", "parent_new", "level_new"]:
                 styles[x] = "background-color: lightgreen"
